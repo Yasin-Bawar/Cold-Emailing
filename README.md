@@ -5,6 +5,7 @@ A free, self-hosted cold-email platform. Connect Gmail or Resend inboxes, keep e
 - **Dashboard** (Prospeo-style): Home stats, People search with filters and bulk actions, Lists, Replies, Campaigns with a live email preview and Approve/Skip/Edit, Activity, Sending accounts, Suppression, Settings, API & MCP.
 - **Sending worker**: weekdays 8am–5pm in each lead's own time zone, warm-up (10 → 20 → 30 → your daily limit per inbox), a random 1–4 minute gap between sends, one-click unsubscribe headers, postal address in every footer, follow-ups in the same thread.
 - **Inbox check**: reads the Gmail inbox every 10 minutes. A reply marks the lead *replied* and cancels its follow-ups. "No thanks" / "unsubscribe" replies and bounces go on the never-email list.
+- **Gmail via Google sign-in** (Gmail API over HTTPS, works on Railway's cheaper plans that block SMTP), Gmail App Password (SMTP/IMAP) or Resend.
 - **MCP server** at `/mcp`: 19 tools for Claude (see below). Claude can draft, queue and approve; only the worker sends, always within the limits above.
 - **Cost**: $0 on Supabase free + Gmail. Railway's trial, then Hobby ($5/month) if you keep it.
 
@@ -28,22 +29,30 @@ Tables are created automatically when the API starts. Every table has row-level 
 
 ## 2. Gmail inboxes (free)
 
-For each @gmail.com sending inbox:
+Railway blocks outgoing SMTP (the normal way apps send email) on its Trial and Hobby plans; only Pro ($20/month) allows it. So on Railway, connect Gmail with **Google sign-in**: it sends and reads mail through the Gmail API over HTTPS, which isn't blocked, and needs no App Password.
 
-1. Turn on **2-Step Verification**.
-2. Create an **App Password** at <https://myaccount.google.com/apppasswords>.
-3. Add it in the dashboard under **Sending accounts → Add Gmail**, then press **Test connection** (it checks SMTP sending and IMAP reading).
+One-time setup in [Google Cloud](https://console.cloud.google.com) (free):
+
+1. Create a project, e.g. "Mavan Outreach".
+2. Enable the **Gmail API** (APIs & Services → Library → Gmail API → Enable).
+3. **Google Auth Platform → Branding**: app name, your email. **Audience**: user type **External**, then **Publish app**. While the app is in "Testing", Google expires the connection every 7 days; once published it stays connected.
+4. **Clients → Create client → Web application**. Authorized redirect URI: `https://YOUR-APP.up.railway.app/oauth/google/callback` (your `PUBLIC_URL` + `/oauth/google/callback`).
+5. Copy the Client ID and Client secret into Railway as `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET` (both services).
+
+Then in the dashboard, **Sending accounts → Connect Gmail**, sign in with the inbox and allow both permissions (send email, read email). Google shows "Google hasn't verified this app": that's expected for your own app; choose **Advanced → Go to Mavan Outreach**. Repeat for each inbox, then press **Test connection**.
 
 Keep each new inbox at the default 40/day limit after warm-up. More inboxes = more volume. 1000 emails is about 25 inbox-days.
 
-Resend works too (**Add Resend**): it needs a domain verified in Resend, and its free plan allows 100/day. Its terms don't allow purchased or scraped lists, so Gmail is the main cold sender here. Replies to Resend emails go to your first Gmail inbox (or the reply-to in Settings), so they're still tracked.
+**Gmail with App Password** (SMTP + IMAP) is still there for running locally or on a host that allows SMTP: turn on 2-Step Verification, create an App Password at <https://myaccount.google.com/apppasswords>, and add it under **Sending accounts → Gmail with App Password**.
+
+Resend works too (**Add Resend**, HTTPS, fine on Railway): it needs a domain verified in Resend, and its free plan allows 100/day. Its terms don't allow purchased or scraped lists, so Gmail is the main cold sender here. Replies to Resend emails go to your first Gmail inbox (or the reply-to in Settings), so they're still tracked.
 
 ## 3. Railway (backend)
 
 One repo, **two services**:
 
 1. New project → **Deploy from GitHub repo** → this repo. That's the **API** service.
-   - Variables: `DATABASE_URL`, `ENCRYPTION_KEY`, `ADMIN_PASSWORD`, `PUBLIC_URL`, `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`.
+   - Variables: `DATABASE_URL`, `ENCRYPTION_KEY`, `ADMIN_PASSWORD`, `PUBLIC_URL`, `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, and (after step 2) `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`.
    - Settings → Networking → **Generate domain**, then set `PUBLIC_URL` to it (e.g. `https://mavan-outreach.up.railway.app`).
    - Build command `pnpm build`, start command `pnpm start` (both are defaults Railway picks up from package.json).
 2. **+ New → GitHub repo** → the same repo again. That's the **worker**.
@@ -54,7 +63,7 @@ One repo, **two services**:
 Open the API domain, sign in with `ADMIN_PASSWORD`, then:
 
 1. **Settings**: add your postal address (required by CAN-SPAM; nothing is sent without it) and your from name.
-2. **Sending accounts**: connect Gmail.
+2. **Sending accounts**: **Connect Gmail** (see step 2).
 3. **API & MCP**: create a token and connect Claude.
 
 ## 4. Connect Claude (MCP)
@@ -85,14 +94,16 @@ Tokens in an email's HTML: `{{image_url}}` (the image, sent inline), `{{postal_a
 
 ## 5. Import the emails already built (Texas, USA, USA 2)
 
-The 251 emails in `Zip-Tech-Agency/outreach/us` (kept out of GitHub) can be loaded as drafts. On your computer, from this repo:
+The 251 emails from `texas-send.zip`, `usa-send.zip` and `usa2-send.zip` load as drafts. On your computer (Node 22+ and pnpm), unzip the three zips, then from this repo:
 
 ```bash
 pnpm install
-OUTREACH_URL=https://YOUR-APP.up.railway.app OUTREACH_TOKEN=YOUR_TOKEN pnpm import:outreach /path/to/Zip-Tech-Agency/outreach/us
+OUTREACH_URL=https://YOUR-APP.up.railway.app OUTREACH_TOKEN=YOUR_TOKEN pnpm import:outreach ~/Downloads/texas-send ~/Downloads/usa-send ~/Downloads/usa2-send
 ```
 
-It creates the campaigns "Texas", "USA" and "USA 2", one lead and one draft per email, with each concept image moved to Storage. The old red address placeholder is filled from Settings at send time. Running it again updates the drafts and creates no duplicates. Then review in **Campaigns** and approve.
+(A folder that contains the three, or `Zip-Tech-Agency/outreach/us`, works too.) It creates the campaigns "Texas", "USA" and "USA 2", one lead and one draft per email, with each concept image moved to Storage. The old red address placeholder is filled from Settings at send time. Running it again updates the drafts and creates no duplicates. Then review in **Campaigns** and approve.
+
+On Windows PowerShell, set the two variables first: `$env:OUTREACH_URL="https://..."; $env:OUTREACH_TOKEN="..."`, then run `pnpm import:outreach C:\Users\you\Downloads\texas-send ...`.
 
 ## How sending works
 

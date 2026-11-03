@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useSearchParams } from 'react-router';
 import { Mail, Plus, Trash2, Pause, Play, PlugZap, CheckCircle2, XCircle, KeyRound, Copy, Terminal, ShieldCheck, Sparkles, Info } from 'lucide-react';
 import { api, fmtDate, timeAgo } from '../api.ts';
 import { Button, Card, CardHeader, Empty, Input, Label, Modal, PageHeader, Spinner, StatusChip, Textarea, cx, useLoad, useToast } from '../ui.tsx';
@@ -6,13 +7,24 @@ import { copy } from './util.ts';
 
 // ---------- Sending accounts ----------
 const ProviderBadge = ({ p }: { p: string }) => (
-  <span className={cx('grid size-10 place-items-center rounded-xl text-sm font-bold', p === 'gmail' ? 'bg-red-50 text-red-600' : 'bg-gray-900 text-white')}>{p === 'gmail' ? 'G' : 'R'}</span>
+  <span className={cx('grid size-10 place-items-center rounded-xl text-sm font-bold', p === 'resend' ? 'bg-gray-900 text-white' : 'bg-red-50 text-red-600')}>{p === 'resend' ? 'R' : 'G'}</span>
 );
 
 export const Accounts = () => {
   const toast = useToast();
   const accounts = useLoad(() => api<any[]>('/accounts'), []);
+  const meta = useLoad(() => api<{ google: boolean; google_redirect_uri: string }>('/meta'), []);
+  const [params, setParams] = useSearchParams();
   const [add, setAdd] = useState<'gmail' | 'resend' | null>(null);
+  const [googleHelp, setGoogleHelp] = useState(false);
+  useEffect(() => {
+    const ok = params.get('connected');
+    const err = params.get('error');
+    if (ok) toast(`${ok} connected. You can test it below.`);
+    if (err) toast(err, 'error');
+    if (ok || err) setParams({}, { replace: true });
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  const connectGoogle = () => { if (meta.data?.google) window.location.href = '/oauth/google/start'; else setGoogleHelp(true); };
   const [form, setForm] = useState({ email: '', from_name: '', secret: '', daily_cap: 40 });
   const [busy, setBusy] = useState('');
   const [tests, setTests] = useState<Record<string, { ok: boolean; checks: { name: string; ok: boolean; detail: string }[] }>>({});
@@ -35,9 +47,9 @@ export const Accounts = () => {
   return (
     <div>
       <PageHeader title="Sending accounts" sub="Inboxes the worker sends from. New inboxes warm up: 10 a day in week 1, 20 in week 2, 30 in week 3, then their daily limit."
-        right={<><Button icon={<Plus className="size-4" />} onClick={() => setAdd('resend')}>Add Resend</Button><Button variant="primary" icon={<Plus className="size-4" />} onClick={() => setAdd('gmail')}>Add Gmail</Button></>} />
+        right={<><Button icon={<Plus className="size-4" />} onClick={() => setAdd('resend')}>Add Resend</Button><Button icon={<Plus className="size-4" />} onClick={() => setAdd('gmail')}>Gmail with App Password</Button><Button variant="primary" icon={<Plus className="size-4" />} onClick={connectGoogle}>Connect Gmail</Button></>} />
       {!accounts.data ? <Spinner /> : accounts.data.length === 0 ? (
-        <Card><Empty icon={<Mail className="size-5" />} title="No sending accounts yet" sub="Connect a Gmail inbox with an App Password. Replies to it are read automatically." action={<Button variant="primary" onClick={() => setAdd('gmail')}>Add Gmail</Button>} /></Card>
+        <Card><Empty icon={<Mail className="size-5" />} title="No sending accounts yet" sub="Connect a Gmail inbox by signing in with Google. Replies to it are read automatically." action={<Button variant="primary" onClick={connectGoogle}>Connect Gmail</Button>} /></Card>
       ) : (
         <div className="grid gap-4 lg:grid-cols-2">
           {accounts.data.map((a) => (
@@ -46,7 +58,7 @@ export const Accounts = () => {
                 <ProviderBadge p={a.provider} />
                 <div className="min-w-0 flex-1">
                   <div className="flex flex-wrap items-center gap-2"><p className="truncate font-semibold">{a.email}</p><StatusChip status={a.status} /></div>
-                  <p className="text-sm text-muted">{a.provider === 'gmail' ? 'Gmail · SMTP + inbox check' : 'Resend API'} · {a.from_name || 'default name'} · since {fmtDate(a.created_at)}</p>
+                  <p className="text-sm text-muted">{a.provider === 'gmail_api' ? 'Gmail · Google sign-in' : a.provider === 'gmail' ? 'Gmail · App Password (SMTP + IMAP)' : 'Resend API'} · {a.from_name || 'default name'} · since {fmtDate(a.created_at)}</p>
                 </div>
               </div>
               <div className="mt-4">
@@ -54,7 +66,7 @@ export const Accounts = () => {
                 <div className="h-2 rounded-full bg-gray-100"><div className="h-2 rounded-full bg-brand-600" style={{ width: `${Math.min(100, (a.sent_today / Math.max(1, a.cap_today)) * 100)}%` }} /></div>
                 <div className="mt-2 flex flex-wrap justify-between gap-2 text-xs text-muted">
                   <span>{a.sent_total} sent in total · limit {a.daily_cap}/day</span>
-                  <span>{a.provider === 'gmail' ? `Inbox checked ${timeAgo(a.imap_checked_at)}` : ''}</span>
+                  <span>{a.provider !== 'resend' ? `Inbox checked ${timeAgo(a.imap_checked_at)}` : ''}</span>
                 </div>
               </div>
               {a.last_error && <p className="mt-3 rounded-lg bg-red-50 px-3 py-2 text-xs text-red-700">{a.last_error}</p>}
@@ -71,6 +83,7 @@ export const Accounts = () => {
                   ? <Button size="sm" icon={<Pause className="size-4" />} onClick={async () => { await api(`/accounts/${a.id}`, { method: 'PATCH', body: { status: 'paused' } }); accounts.reload(); }}>Pause</Button>
                   : <Button size="sm" icon={<Play className="size-4" />} onClick={async () => { await api(`/accounts/${a.id}`, { method: 'PATCH', body: { status: 'active' } }); accounts.reload(); }}>Resume</Button>}
                 <Button size="sm" onClick={async () => { const v = prompt('Daily limit after warm-up (Gmail: keep it at 40 or below)', String(a.daily_cap)); if (v && Number(v) > 0) { await api(`/accounts/${a.id}`, { method: 'PATCH', body: { daily_cap: Number(v) } }); accounts.reload(); } }}>Daily limit</Button>
+                {a.provider === 'gmail_api' && a.status === 'error' && <Button size="sm" onClick={connectGoogle}>Reconnect</Button>}
                 <Button size="sm" variant="danger" className="ml-auto" icon={<Trash2 className="size-4" />} onClick={async () => { if (confirm(`Remove ${a.email}?`)) { await api(`/accounts/${a.id}`, { method: 'DELETE' }); accounts.reload(); } }}>Remove</Button>
               </div>
             </Card>
@@ -78,10 +91,22 @@ export const Accounts = () => {
         </div>
       )}
 
+      <Modal open={googleHelp} onClose={() => setGoogleHelp(false)} title="Turn on Connect Gmail" wide sub="One-time setup in Google Cloud (free). Then every inbox connects with one click.">
+        <ol className="list-decimal space-y-2 pl-5 text-sm text-gray-700">
+          <li>Open <a className="font-medium text-brand-600 underline" href="https://console.cloud.google.com/projectcreate" target="_blank" rel="noreferrer">Google Cloud</a> and create a project (e.g. "Mavan Outreach").</li>
+          <li>Enable the <a className="font-medium text-brand-600 underline" href="https://console.cloud.google.com/apis/library/gmail.googleapis.com" target="_blank" rel="noreferrer">Gmail API</a>.</li>
+          <li>Google Auth Platform → Branding/Audience: user type <b>External</b>, then <b>Publish app</b> (so the connection doesn't expire after 7 days).</li>
+          <li>Clients → Create client → <b>Web application</b>. Authorized redirect URI:<code className="mt-1 block rounded-md bg-gray-100 px-2 py-1 text-xs break-all">{meta.data?.google_redirect_uri || '…/oauth/google/callback'}</code></li>
+          <li>Put the Client ID and Client secret into Railway as <code className="rounded bg-gray-100 px-1">GOOGLE_CLIENT_ID</code> and <code className="rounded bg-gray-100 px-1">GOOGLE_CLIENT_SECRET</code> (on both services), then press Connect Gmail again.</li>
+        </ol>
+        <p className="mt-4 text-xs text-muted">Google will show "Google hasn't verified this app". That's expected for your own app: choose Advanced → Go to Mavan Outreach.</p>
+      </Modal>
+
       <Modal open={!!add} onClose={() => setAdd(null)} title={add === 'gmail' ? 'Connect a Gmail inbox' : 'Connect Resend'} wide
         footer={<><Button onClick={() => setAdd(null)}>Cancel</Button><Button variant="primary" loading={busy === 'add'} disabled={!form.email || form.secret.length < 8} onClick={save}>Connect</Button></>}>
         {add === 'gmail' ? (
           <div className="mb-5 rounded-xl bg-brand-50/60 p-4 text-sm text-gray-700">
+            <p className="mb-2 rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-800">App Passwords send over SMTP, which Railway blocks on its Trial and Hobby plans. On Railway, use <b>Connect Gmail</b> instead.</p>
             <p className="mb-2 font-semibold text-ink">Get an App Password (2 minutes)</p>
             <ol className="list-decimal space-y-1 pl-5">
               <li>Turn on 2-Step Verification in the Google Account for this inbox.</li>

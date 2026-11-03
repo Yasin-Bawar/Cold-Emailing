@@ -11,15 +11,18 @@ import { gmailSender } from './senders/gmail.ts';
 import { resendSender } from './senders/resend.ts';
 import type { Attachment, Sender } from './senders/types.ts';
 import { classify, fetchNew, stripQuoted, type InMessage } from './inbox.ts';
+import { fetchNewGmailApi, gmailApiSender } from './google.ts';
 import { getSettings, logEvent, suppress, STOP_LEAD_STATUSES } from './repo.ts';
 
 export type AccountRow = {
-  id: string; provider: 'gmail' | 'resend'; email: string; from_name: string | null; secret_enc: string;
+  id: string; provider: 'gmail' | 'gmail_api' | 'resend'; email: string; from_name: string | null; secret_enc: string;
   daily_cap: number; warmup_start: Date; status: string; fail_streak: number; imap_last_uid: string | number;
 };
 
 export const senderFor = (a: AccountRow): Sender =>
-  a.provider === 'gmail' ? gmailSender(a.email, decrypt(a.secret_enc)) : resendSender(decrypt(a.secret_enc));
+  a.provider === 'gmail' ? gmailSender(a.email, decrypt(a.secret_enc))
+    : a.provider === 'gmail_api' ? gmailApiSender(a.email, decrypt(a.secret_enc))
+    : resendSender(decrypt(a.secret_enc));
 
 export const unsubscribeUrl = (leadId: string) => `${env.publicUrl}/u/${unsubToken(leadId)}`;
 
@@ -39,7 +42,7 @@ export const sendTick = async (now = new Date(), makeSender: (a: AccountRow) => 
 
   const accounts = (await sql`select * from accounts where status = 'active' and (next_send_at is null or next_send_at <= ${now})`) as unknown as AccountRow[];
   const activeIds = (await sql`select id from accounts where status = 'active'`).map((r) => r.id as string);
-  const firstGmail = (await sql`select email from accounts where provider = 'gmail' and status <> 'error' order by created_at limit 1`)[0]?.email as string | undefined;
+  const firstGmail = (await sql`select email from accounts where provider in ('gmail', 'gmail_api') and status <> 'error' order by created_at limit 1`)[0]?.email as string | undefined;
   const since = dayStart(now);
   const results: SendOutcome[] = [];
 
@@ -108,7 +111,7 @@ export const sendTick = async (now = new Date(), makeSender: (a: AccountRow) => 
         attachments,
       });
       sender.close?.();
-      await sql`update emails set status = 'sent', sent_at = ${now}, provider_message_id = ${res.providerId}, message_id_header = ${messageId}, error = null where id = ${pick.id}`;
+      await sql`update emails set status = 'sent', sent_at = ${now}, provider_message_id = ${res.providerId}, message_id_header = ${res.messageId || messageId}, error = null where id = ${pick.id}`;
       await sql`update leads set status = 'sent', updated_at = now() where id = ${pick.lead_id} and status in ('new', 'queued')`;
       await sql`update accounts set fail_streak = 0, last_error = null, next_send_at = ${new Date(now.getTime() + nextGapMs())} where id = ${acc.id}`;
       await logEvent('sent', { to: pick.lead_email, subject: pick.subject, step: pick.step, from: acc.email }, { lead_id: pick.lead_id as string, email_id: pick.id as string, account_id: acc.id });
@@ -170,14 +173,15 @@ export const handleInbound = async (messages: InMessage[], ownAddresses: string[
   return out;
 };
 
-export const inboxTick = async (fetcher: typeof fetchNew = fetchNew) => {
+export const inboxTick = async (fetcher?: typeof fetchNew) => {
   const sql = db();
-  const accounts = (await sql`select * from accounts where provider = 'gmail' and status <> 'error' order by created_at`) as unknown as AccountRow[];
+  const accounts = (await sql`select * from accounts where provider in ('gmail', 'gmail_api') and status <> 'error' order by created_at`) as unknown as AccountRow[];
   const own = (await sql`select email from accounts`).map((r) => String(r.email).toLowerCase());
   const results: Record<string, unknown>[] = [];
   for (const a of accounts) {
     try {
-      const { messages, maxUid } = await fetcher(a.email, decrypt(a.secret_enc), Number(a.imap_last_uid) || 0);
+      const fetch = fetcher ?? (a.provider === 'gmail_api' ? fetchNewGmailApi : fetchNew);
+      const { messages, maxUid } = await fetch(a.email, decrypt(a.secret_enc), Number(a.imap_last_uid) || 0);
       const r = await handleInbound(messages, own);
       await sql`update accounts set imap_last_uid = ${maxUid}, imap_checked_at = now() where id = ${a.id}`;
       results.push({ account: a.email, fetched: messages.length, ...r });

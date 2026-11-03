@@ -410,12 +410,13 @@ export const listAccounts = async (now = new Date()): Promise<Record<string, any
   return rows.map((a) => ({ ...(a as Record<string, any>), cap_today: warmupCap(a.daily_cap as number, a.warmup_start as Date, now) }));
 };
 
-export const addAccount = async (a: { provider: 'gmail' | 'resend'; email: string; from_name?: string | null; secret: string; daily_cap: number; warmup_start?: string }) => {
+export const addAccount = async (a: { provider: 'gmail' | 'gmail_api' | 'resend'; email: string; from_name?: string | null; secret: string; daily_cap: number; warmup_start?: string }) => {
   const sql = db();
   const [row] = await sql`insert into accounts (provider, email, from_name, secret_enc, daily_cap, warmup_start)
     values (${a.provider}, ${a.email}, ${a.from_name ?? null}, ${encrypt(a.secret.trim())}, ${a.daily_cap}, ${a.warmup_start ?? sql`current_date`})
     on conflict (email) do update set provider = excluded.provider, from_name = excluded.from_name, secret_enc = excluded.secret_enc,
-      daily_cap = excluded.daily_cap, status = 'active', fail_streak = 0, last_error = null
+      daily_cap = excluded.daily_cap, status = 'active', fail_streak = 0, last_error = null,
+      imap_last_uid = case when accounts.provider = excluded.provider then accounts.imap_last_uid else 0 end
     returning id, provider, email, from_name, daily_cap, warmup_start, status`;
   await logEvent('account_added', { provider: a.provider, email: a.email }, { account_id: row.id });
   return row;

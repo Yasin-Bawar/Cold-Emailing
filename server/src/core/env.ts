@@ -33,5 +33,8 @@ export const env = {
   get imapTick() { return Number(read('IMAP_TICK_SECONDS', '600')); },
   // Test hook: an SMTP/IMAP host override (e.g. a local fake server). Leave unset in production.
   get smtpHostOverride() { return process.env.SMTP_HOST_OVERRIDE?.trim() || ''; },
+  // Google sign-in for Gmail (Gmail API over HTTPS). Create an OAuth client in Google Cloud; see README.
+  get googleClientId() { return process.env.GOOGLE_CLIENT_ID?.trim() || ''; },
+  get googleClientSecret() { return process.env.GOOGLE_CLIENT_SECRET?.trim() || ''; },
   get resendApiBase() { return read('RESEND_API_BASE', 'https://api.resend.com'); },
 };

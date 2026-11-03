@@ -11,6 +11,7 @@ import { gmailSender } from '../core/senders/gmail.ts';
 import { resendSender } from '../core/senders/resend.ts';
 import { verifyImap } from '../core/inbox.ts';
 import { unsubscribeUrl } from '../core/engine.ts';
+import { gmailApiSender, googleConfigured, redirectUri } from '../core/google.ts';
 import { createToken, listTokens, revokeToken } from './auth.ts';
 
 export const api = Router();
@@ -43,7 +44,7 @@ api.get('/queue', async (_req, res) => res.json(await repo.queueStatus()));
 api.get('/activity', async (req, res) =>
   res.json(await repo.listActivity({ type: arr(req.query.type), limit: Math.min(Number(req.query.limit) || 50, 200), offset: Number(req.query.offset) || 0 })));
 api.get('/replies', async (req, res) => res.json(await repo.listReplies({ since: (req.query.since as string) || undefined, limit: Math.min(Number(req.query.limit) || 50, 200), offset: Number(req.query.offset) || 0 })));
-api.get('/meta', async (_req, res) => res.json({ storage: storageKind(), public_url: env.publicUrl, lead_statuses: LEAD_STATUSES }));
+api.get('/meta', async (_req, res) => res.json({ storage: storageKind(), public_url: env.publicUrl, lead_statuses: LEAD_STATUSES, google: googleConfigured(), google_redirect_uri: redirectUri() }));
 
 // ---------- leads ----------
 api.get('/leads', async (req, res) => res.json(await repo.searchLeads(leadFilterFrom(req.query))));
@@ -221,6 +222,8 @@ api.post('/accounts/:id/test', async (req, res) => {
     await run('Sending (SMTP)', () => s.verify());
     s.close?.();
     await run('Inbox (IMAP)', () => verifyImap(a.email, secret));
+  } else if (a.provider === 'gmail_api') {
+    await run('Gmail (Google sign-in)', () => gmailApiSender(a.email, secret).verify());
   } else {
     await run('Resend API key', () => resendSender(secret).verify());
   }

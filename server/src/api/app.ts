@@ -10,6 +10,8 @@ import { handleMcp } from '../mcp/server.ts';
 import { db } from '../core/db.ts';
 import { checkFileSig } from '../core/crypto.ts';
 import { getFile, contentTypeFor } from '../core/storage.ts';
+import { authUrl, checkState, exchangeCode, googleConfigured, makeState } from '../core/google.ts';
+import { addAccount, getSettings } from '../core/repo.ts';
 
 export const buildApp = () => {
   const app = express();
@@ -38,6 +40,25 @@ export const buildApp = () => {
       res.send(bytes);
     } catch {
       res.status(404).send('Not found');
+    }
+  });
+
+  // "Connect Gmail with Google": start needs a dashboard session; the callback is checked with the signed state.
+  app.get('/oauth/google/start', requireAuth, (req, res) => {
+    if (!googleConfigured()) return res.redirect('/accounts?error=' + encodeURIComponent('Add GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET to the server first (see README).'));
+    res.redirect(authUrl(makeState(), typeof req.query.hint === 'string' ? req.query.hint : undefined));
+  });
+  app.get('/oauth/google/callback', async (req, res) => {
+    const back = (q: string) => res.redirect(`/accounts?${q}`);
+    if (req.query.error) return back('error=' + encodeURIComponent(`Google: ${req.query.error}`));
+    if (!checkState(String(req.query.state || ''))) return back('error=' + encodeURIComponent('The sign-in link expired. Try Connect Gmail again.'));
+    try {
+      const { email, refreshToken } = await exchangeCode(String(req.query.code || ''));
+      const s = await getSettings();
+      await addAccount({ provider: 'gmail_api', email, from_name: null, secret: refreshToken, daily_cap: Math.min(40, s.default_daily_cap) });
+      back('connected=' + encodeURIComponent(email));
+    } catch (e) {
+      back('error=' + encodeURIComponent((e as Error).message));
     }
   });
 
