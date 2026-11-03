@@ -1,0 +1,39 @@
+{
+  "name": "server",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev:api": "tsx watch src/api/index.ts",
+    "dev:worker": "tsx watch src/worker/index.ts",
+    "start:api": "tsx src/api/index.ts",
+    "start:worker": "tsx src/worker/index.ts",
+    "migrate": "tsx src/scripts/migrate.ts",
+    "import:outreach": "tsx src/scripts/import-outreach.ts",
+    "token:create": "tsx src/scripts/create-token.ts",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "start": "tsx src/start.ts"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.32.2",
+    "@supabase/supabase-js": "^2.118.0",
+    "cors": "^2.8.6",
+    "express": "^5.3.0",
+    "imapflow": "^2.10.0",
+    "jose": "^6.2.15",
+    "mailparser": "^3.14.1",
+    "nodemailer": "^10.3.1",
+    "postgres": "^4.0.0",
+    "tsx": "^4.23.15",
+    "zod": "^4.6.7"
+  },
+  "devDependencies": {
+    "@types/cors": "^2.8.19",
+    "@types/express": "^5.0.6",
+    "@types/mailparser": "^3.9.0",
+    "@types/node": "^26.6.6",
+    "@types/nodemailer": "^8.0.2",
+    "typescript": "^7.0.2",
+    "vitest": "^5.1.0"
+  }
+}

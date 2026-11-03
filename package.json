@@ -1,0 +1,22 @@
+{
+  "name": "mavan-outreach",
+  "private": true,
+  "packageManager": "pnpm@10.28.0",
+  "scripts": {
+    "dev:api": "pnpm --filter server dev:api",
+    "dev:worker": "pnpm --filter server dev:worker",
+    "dev:web": "pnpm --filter web dev",
+    "build": "pnpm --filter web build",
+    "start": "pnpm --filter server start",
+    "start:api": "pnpm --filter server start:api",
+    "start:worker": "pnpm --filter server start:worker",
+    "migrate": "pnpm --filter server migrate",
+    "token:create": "pnpm --filter server token:create",
+    "import:outreach": "pnpm --filter server import:outreach",
+    "typecheck": "pnpm --filter server typecheck && pnpm --filter web typecheck",
+    "test": "pnpm --filter server test"
+  },
+  "engines": {
+    "node": ">=22"
+  }
+}
