@@ -2,8 +2,10 @@
 import { env } from '../core/env.ts';
 import { inboxTick, sendTick } from '../core/engine.ts';
 import { closeDb } from '../core/db.ts';
+import { migrate } from '../scripts/migrate.ts';
 
 void env.databaseUrl; void env.encryptionKey;
+if (process.env.AUTO_MIGRATE !== 'false') await migrate((m) => console.log(`[migrate] ${m}`));
 let stopping = false;
 const log = (...a: unknown[]) => console.log(new Date().toISOString(), ...a);
 

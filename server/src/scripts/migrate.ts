@@ -7,19 +7,20 @@ import { db, closeDb } from '../core/db.ts';
 export const migrate = async (log = console.log) => {
   const sql = db();
   const dir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../../supabase/migrations');
-  await sql`create table if not exists _migrations (name text primary key, applied_at timestamptz not null default now())`;
-  await sql`alter table _migrations enable row level security`;
-  const done = new Set((await sql`select name from _migrations`).map((r) => r.name as string));
   const files = (await readdir(dir)).filter((f) => f.endsWith('.sql')).sort();
-  for (const f of files) {
-    if (done.has(f)) continue;
-    const body = await readFile(path.join(dir, f), 'utf8');
-    await sql.begin(async (tx) => {
-      await tx.unsafe(body);
+  // One transaction with an advisory lock, so the API and the worker starting together can't both apply a migration.
+  await sql.begin(async (tx) => {
+    await tx`select pg_advisory_xact_lock(727274001)`;
+    await tx`create table if not exists _migrations (name text primary key, applied_at timestamptz not null default now())`;
+    await tx`alter table _migrations enable row level security`;
+    const done = new Set((await tx`select name from _migrations`).map((r) => r.name as string));
+    for (const f of files) {
+      if (done.has(f)) continue;
+      await tx.unsafe(await readFile(path.join(dir, f), 'utf8'));
       await tx`insert into _migrations (name) values (${f})`;
-    });
-    log(`applied ${f}`);
-  }
+      log(`applied ${f}`);
+    }
+  });
   log('database is up to date');
 };
 
