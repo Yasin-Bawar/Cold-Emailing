@@ -187,7 +187,7 @@ export const McpPage = () => {
   const [name, setName] = useState('Claude Code');
   const [fresh, setFresh] = useState<string | null>(null);
   const origin = window.location.origin;
-  const cmd = `claude mcp add --transport http mavan ${origin}/mcp --header "Authorization: Bearer ${fresh || 'YOUR_TOKEN'}"`;
+  const cmd = `claude mcp add --scope user --transport http mavan ${origin}/mcp --header "Authorization: Bearer ${fresh || 'YOUR_TOKEN'}"`;
   const create = async () => {
     try { const t = await api<any>('/tokens', { body: { name } }); setFresh(t.token); tokens.reload(); } catch (e) { toast((e as Error).message, 'error'); }
   };

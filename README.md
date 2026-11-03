@@ -71,7 +71,7 @@ Open the API domain, sign in with `ADMIN_PASSWORD`, then:
 In the dashboard, **API & MCP → Create token**, then on your computer:
 
 ```bash
-claude mcp add --transport http mavan https://YOUR-APP.up.railway.app/mcp --header "Authorization: Bearer YOUR_TOKEN"
+claude mcp add --scope user --transport http mavan https://YOUR-APP.up.railway.app/mcp --header "Authorization: Bearer YOUR_TOKEN"
 ```
 
 Paste the token only into that command, never into a chat. Then ask Claude things like:
