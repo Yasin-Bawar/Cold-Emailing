@@ -25,7 +25,8 @@ export const env = {
   get port() { return Number(read('PORT', '8080')); },
   // Supabase Storage. Without these, files are kept on local disk in STORAGE_DIR (fine for local development only).
   get supabaseUrl() { return process.env.SUPABASE_URL?.trim() || ''; },
-  get supabaseServiceKey() { return process.env.SUPABASE_SERVICE_ROLE_KEY?.trim() || ''; },
+  // Supabase's newer dashboard calls it the "secret" key (sb_secret_...); the older one "service_role". Either name works.
+  get supabaseServiceKey() { return (process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SECRET_KEY || '').trim(); },
   get storageBucket() { return read('STORAGE_BUCKET', 'campaign-assets'); },
   get storageDir() { return read('STORAGE_DIR', '.storage'); },
   // Worker timings, in seconds. Mostly useful for tests.
