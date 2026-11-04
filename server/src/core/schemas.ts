@@ -80,6 +80,7 @@ export const AccountInput = z.object({
   secret: z.string().min(8).max(500),
   daily_cap: z.coerce.number().int().min(1).max(500).default(40),
   warmup_start: z.string().date().optional(),
+  warmed_up: z.boolean().optional(), // skip the 10/20/30-a-day warm-up (inbox already has a sending history)
 });
 
 export const SettingsPatch = z.object({

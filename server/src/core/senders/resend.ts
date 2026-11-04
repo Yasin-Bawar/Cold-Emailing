@@ -36,7 +36,7 @@ export const resendSender = (apiKey: string): Sender => {
           })),
         }),
       });
-      if (status >= 300 || !body?.id) throw new Error(`Resend ${status}: ${body?.message || body?.name || 'send failed'}`);
+      if (status >= 300 || !body?.id) throw Object.assign(new Error(`Resend ${status}: ${[body?.name, body?.message].filter(Boolean).join(' - ') || 'send failed'}`), { status, code: body?.name });
       return { providerId: String(body.id), messageId: m.messageId };
     },
     async verify() {

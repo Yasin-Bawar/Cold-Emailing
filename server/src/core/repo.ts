@@ -3,7 +3,7 @@ import { randomUUID } from 'node:crypto';
 import { db } from './db.ts';
 import { encrypt } from './crypto.ts';
 import { validZone, zoneFor } from './window.ts';
-import { dayStart, warmupCap } from './caps.ts';
+import { accountDayStart, warmupCap, warmupDays, WARMUP_DAYS } from './caps.ts';
 import { putFile, removeFile, contentTypeFor } from './storage.ts';
 import type { EmailInput, LeadFilter, LeadInput, LeadPatch } from './schemas.ts';
 
@@ -408,32 +408,39 @@ export const unsuppress = async (email: string) => {
 // ---------- accounts ----------
 export const listAccounts = async (now = new Date()): Promise<Record<string, any>[]> => {
   const sql = db();
-  const since = dayStart(now);
+  const resendSince = accountDayStart('resend', now);
+  const otherSince = accountDayStart('gmail', now);
   const rows = await sql`select a.id, a.provider, a.email, a.from_name, a.daily_cap, a.warmup_start, a.status, a.fail_streak, a.last_error,
       a.next_send_at, a.imap_checked_at, a.created_at,
-      (select count(*)::int from emails e where e.account_id = a.id and e.status = 'sent' and e.sent_at >= ${since}) as sent_today,
+      (select count(*)::int from emails e where e.account_id = a.id and e.status = 'sent'
+         and e.sent_at >= case when a.provider = 'resend' then ${resendSince}::timestamptz else ${otherSince}::timestamptz end) as sent_today,
       (select count(*)::int from emails e where e.account_id = a.id and e.status = 'sent') as sent_total
     from accounts a order by a.created_at`;
-  return rows.map((a) => ({ ...(a as Record<string, any>), cap_today: warmupCap(a.daily_cap as number, a.warmup_start as Date, now) }));
+  return rows.map((a) => {
+    const days = warmupDays(a.warmup_start as Date, now);
+    return { ...(a as Record<string, any>), cap_today: warmupCap(a.daily_cap as number, a.warmup_start as Date, now), warming_up: days < WARMUP_DAYS, warmup_day: days + 1 };
+  });
 };
 
-export const addAccount = async (a: { provider: 'gmail' | 'gmail_api' | 'resend'; email: string; from_name?: string | null; secret: string; daily_cap: number; warmup_start?: string }) => {
+export const addAccount = async (a: { provider: 'gmail' | 'gmail_api' | 'resend'; email: string; from_name?: string | null; secret: string; daily_cap: number; warmup_start?: string; warmed_up?: boolean }) => {
   const sql = db();
   const [row] = await sql`insert into accounts (provider, email, from_name, secret_enc, daily_cap, warmup_start)
-    values (${a.provider}, ${a.email}, ${a.from_name ?? null}, ${encrypt(a.secret.trim())}, ${a.daily_cap}, ${a.warmup_start ?? sql`current_date`})
+    values (${a.provider}, ${a.email}, ${a.from_name ?? null}, ${encrypt(a.secret.trim())}, ${a.daily_cap}, ${a.warmed_up ? sql`current_date - 28` : a.warmup_start ?? sql`current_date`})
     on conflict (email) do update set provider = excluded.provider, from_name = excluded.from_name, secret_enc = excluded.secret_enc,
       daily_cap = excluded.daily_cap, status = 'active', fail_streak = 0, last_error = null,
+      warmup_start = ${a.warmed_up || a.warmup_start ? sql`excluded.warmup_start` : sql`accounts.warmup_start`},
       imap_last_uid = case when accounts.provider = excluded.provider then accounts.imap_last_uid else 0 end
     returning id, provider, email, from_name, daily_cap, warmup_start, status`;
   await logEvent('account_added', { provider: a.provider, email: a.email }, { account_id: row.id });
   return row;
 };
 
-export const updateAccount = async (id: string, patch: { from_name?: string | null; daily_cap?: number; status?: 'active' | 'paused'; secret?: string }) => {
+export const updateAccount = async (id: string, patch: { from_name?: string | null; daily_cap?: number; status?: 'active' | 'paused'; secret?: string; warmed_up?: boolean }) => {
   const sql = db();
   const clean: Record<string, unknown> = {};
   if (patch.from_name !== undefined) clean.from_name = patch.from_name;
   if (patch.daily_cap !== undefined) clean.daily_cap = patch.daily_cap;
+  if (patch.warmed_up !== undefined) await sql`update accounts set warmup_start = ${patch.warmed_up ? sql`current_date - 28` : sql`current_date`} where id = ${id}`;
   if (patch.status !== undefined) Object.assign(clean, { status: patch.status, fail_streak: 0, last_error: null });
   if (patch.secret) Object.assign(clean, { secret_enc: encrypt(patch.secret.trim()), status: 'active', fail_streak: 0, last_error: null });
   if (Object.keys(clean).length) await sql`update accounts set ${sql(clean as any, Object.keys(clean) as any)} where id = ${id}`;

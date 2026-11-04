@@ -210,3 +210,45 @@ d2('template generation', async () => {
     expect(truck2.html).toContain('New hook line.');
   });
 });
+
+const d3 = process.env.TEST_DATABASE_URL ? describe : describe.skip;
+d3('Resend accounts: warmed up, 100 a day, limit errors', async () => {
+  process.env.DATABASE_URL = process.env.TEST_DATABASE_URL;
+  const { db, closeDb } = await import('../src/core/db.ts');
+  const { migrate } = await import('../src/scripts/migrate.ts');
+  const repo = await import('../src/core/repo.ts');
+  const { sendTick } = await import('../src/core/engine.ts');
+  afterAll(async () => { await closeDb(); });
+
+  it('uses the full limit at once and rests until the next UTC day on a quota error', async () => {
+    const sql = db();
+    await sql`drop schema public cascade`;
+    await sql`create schema public`;
+    await migrate(() => {});
+    await repo.updateSettings({ postal_address: '1 Test St' });
+    const acc = await repo.addAccount({ provider: 'resend', email: 'hi@mavan.app', secret: 're_test_key_123', daily_cap: 100, warmed_up: true });
+    const [a] = await repo.listAccounts(new Date());
+    expect(a).toMatchObject({ cap_today: 100, warming_up: false });
+    // Re-adding without the flag keeps the warm-up date.
+    await repo.addAccount({ provider: 'resend', email: 'hi@mavan.app', secret: 're_test_key_456', daily_cap: 100 });
+    expect((await repo.listAccounts(new Date()))[0].warming_up).toBe(false);
+    await repo.updateAccount(acc.id, { warmed_up: false });
+    expect((await repo.listAccounts(new Date()))[0]).toMatchObject({ warming_up: true, cap_today: 10 });
+    await repo.updateAccount(acc.id, { warmed_up: true });
+
+    const c = await repo.createCampaign('R');
+    await repo.upsertLeads([1, 2].map((i) => ({ email: `r${i}@x.com`, state: 'TX' })), { campaign_id: c.id });
+    for (const i of [1, 2]) await repo.addEmail({ lead_email: `r${i}@x.com`, step: 0, delay_days: 0, subject: 's', text: 't' });
+    await repo.approveEmails({ campaign_id: c.id });
+    const quota = () => ({ async send() { throw Object.assign(new Error('Resend 429: daily_quota_exceeded - You have reached your daily email sending quota.'), { status: 429 }); }, async verify() { return 'ok'; } });
+    const now = new Date('2026-11-04T16:00:00Z');
+    const r = await sendTick(now, quota as any);
+    expect(r.results[0].held).toMatch(/limit reached, resting until 2026-11-05T00:00:00.000Z/);
+    const [row] = await sql`select status, fail_streak, next_send_at from accounts`;
+    expect(row.status).toBe('active');
+    expect(row.fail_streak).toBe(0);
+    expect(new Date(row.next_send_at).toISOString()).toBe('2026-11-05T00:00:00.000Z');
+    expect((await repo.listEmails({ status: ['approved'] })).total).toBe(2); // nothing lost
+    expect((await repo.listEmails({ status: ['failed'] })).total).toBe(0);
+  });
+});

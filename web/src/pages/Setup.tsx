@@ -25,7 +25,8 @@ export const Accounts = () => {
     if (ok || err) setParams({}, { replace: true });
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
   const connectGoogle = () => { if (meta.data?.google) window.location.href = '/oauth/google/start'; else setGoogleHelp(true); };
-  const [form, setForm] = useState({ email: '', from_name: '', secret: '', daily_cap: 40 });
+  const [form, setForm] = useState({ email: '', from_name: '', secret: '', daily_cap: 40, warmed_up: false });
+  const openAdd = (p: 'gmail' | 'resend') => { setForm({ email: '', from_name: '', secret: '', daily_cap: p === 'resend' ? 100 : 40, warmed_up: false }); setAdd(p); };
   const [busy, setBusy] = useState('');
   const [tests, setTests] = useState<Record<string, { ok: boolean; checks: { name: string; ok: boolean; detail: string }[] }>>({});
 
@@ -34,7 +35,7 @@ export const Accounts = () => {
     try {
       const a = await api<any>('/accounts', { body: { provider: add, ...form, from_name: form.from_name || null } });
       toast('Account connected. Testing it now…');
-      setAdd(null); setForm({ email: '', from_name: '', secret: '', daily_cap: 40 });
+      setAdd(null);
       accounts.reload();
       test(a.id);
     } catch (e) { toast((e as Error).message, 'error'); } finally { setBusy(''); }
@@ -47,7 +48,12 @@ export const Accounts = () => {
   return (
     <div>
       <PageHeader title="Sending accounts" sub="Inboxes the worker sends from. New inboxes warm up: 10 a day in week 1, 20 in week 2, 30 in week 3, then their daily limit."
-        right={<><Button icon={<Plus className="size-4" />} onClick={() => setAdd('resend')}>Add Resend</Button><Button icon={<Plus className="size-4" />} onClick={() => setAdd('gmail')}>Gmail with App Password</Button><Button variant="primary" icon={<Plus className="size-4" />} onClick={connectGoogle}>Connect Gmail</Button></>} />
+        right={<><Button icon={<Plus className="size-4" />} onClick={() => openAdd('resend')}>Add Resend</Button><Button icon={<Plus className="size-4" />} onClick={() => openAdd('gmail')}>Gmail with App Password</Button><Button variant="primary" icon={<Plus className="size-4" />} onClick={connectGoogle}>Connect Gmail</Button></>} />
+      {accounts.data && accounts.data.some((a) => a.provider === 'resend') && !accounts.data.some((a) => a.provider !== 'resend' && a.status !== 'error') && (
+        <div className="mb-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+          <b>Replies to your Resend emails aren't being tracked yet.</b> Connect one Gmail inbox (you can press Pause on it so it never sends) and replies will land there and show up under Replies. Or set a reply-to address in Settings that you check yourself.
+        </div>
+      )}
       {!accounts.data ? <Spinner /> : accounts.data.length === 0 ? (
         <Card><Empty icon={<Mail className="size-5" />} title="No sending accounts yet" sub="Connect a Gmail inbox by signing in with Google. Replies to it are read automatically." action={<Button variant="primary" onClick={connectGoogle}>Connect Gmail</Button>} /></Card>
       ) : (
@@ -65,7 +71,7 @@ export const Accounts = () => {
                 <div className="mb-1.5 flex justify-between text-sm"><span className="text-muted">Sent today</span><span className="font-medium tabular-nums">{a.sent_today} / {a.cap_today}</span></div>
                 <div className="h-2 rounded-full bg-gray-100"><div className="h-2 rounded-full bg-brand-600" style={{ width: `${Math.min(100, (a.sent_today / Math.max(1, a.cap_today)) * 100)}%` }} /></div>
                 <div className="mt-2 flex flex-wrap justify-between gap-2 text-xs text-muted">
-                  <span>{a.sent_total} sent in total · limit {a.daily_cap}/day</span>
+                  <span>{a.sent_total} sent in total · limit {a.daily_cap}/day · {a.warming_up ? `warming up (day ${a.warmup_day} of 21)` : 'warmed up'}{a.provider === 'resend' ? ' · day resets at 00:00 UTC' : ''}</span>
                   <span>{a.provider !== 'resend' ? `Inbox checked ${timeAgo(a.imap_checked_at)}` : ''}</span>
                 </div>
               </div>
@@ -82,7 +88,10 @@ export const Accounts = () => {
                 {a.status === 'active'
                   ? <Button size="sm" icon={<Pause className="size-4" />} onClick={async () => { await api(`/accounts/${a.id}`, { method: 'PATCH', body: { status: 'paused' } }); accounts.reload(); }}>Pause</Button>
                   : <Button size="sm" icon={<Play className="size-4" />} onClick={async () => { await api(`/accounts/${a.id}`, { method: 'PATCH', body: { status: 'active' } }); accounts.reload(); }}>Resume</Button>}
-                <Button size="sm" onClick={async () => { const v = prompt('Daily limit after warm-up (Gmail: keep it at 40 or below)', String(a.daily_cap)); if (v && Number(v) > 0) { await api(`/accounts/${a.id}`, { method: 'PATCH', body: { daily_cap: Number(v) } }); accounts.reload(); } }}>Daily limit</Button>
+                {a.warming_up
+                  ? <Button size="sm" onClick={async () => { if (confirm(`Skip the warm-up for ${a.email}? Only do this if the inbox already has a sending history.`)) { await api(`/accounts/${a.id}`, { method: 'PATCH', body: { warmed_up: true } }); toast('Marked as warmed up.'); accounts.reload(); } }}>Mark as warmed up</Button>
+                  : null}
+                <Button size="sm" onClick={async () => { const v = prompt(a.provider === 'resend' ? 'Daily limit (Resend free plan: 100)' : 'Daily limit after warm-up (Gmail: keep it at 40 or below)', String(a.daily_cap)); if (v && Number(v) > 0) { await api(`/accounts/${a.id}`, { method: 'PATCH', body: { daily_cap: Number(v) } }); accounts.reload(); } }}>Daily limit</Button>
                 {a.provider === 'gmail_api' && a.status === 'error' && <Button size="sm" onClick={connectGoogle}>Reconnect</Button>}
                 <Button size="sm" variant="danger" className="ml-auto" icon={<Trash2 className="size-4" />} onClick={async () => { if (confirm(`Remove ${a.email}?`)) { await api(`/accounts/${a.id}`, { method: 'DELETE' }); accounts.reload(); } }}>Remove</Button>
               </div>
@@ -117,15 +126,19 @@ export const Accounts = () => {
         ) : (
           <div className="mb-5 rounded-xl bg-gray-50 p-4 text-sm text-gray-700">
             <p className="mb-1 font-semibold text-ink">Resend</p>
-            <p>The From address must be on a domain verified in Resend. Replies go to your first Gmail inbox (or the reply-to in Settings) so they're tracked. Resend's free plan allows 100 emails a day, and its terms don't allow purchased or scraped lists.</p>
+            <p>The From address must be on a domain verified in Resend. Replies go to your first Gmail inbox (or the reply-to in Settings) so they're tracked. Resend's free plan allows 100 emails a day and 3,000 a month per account (the platform counts Resend's day in UTC, like Resend does). Its terms don't allow purchased or scraped lists.</p>
           </div>
         )}
         <div className="grid gap-4 sm:grid-cols-2">
           <div><Label>{add === 'gmail' ? 'Gmail address' : 'From address'}</Label><Input type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} placeholder={add === 'gmail' ? 'you@gmail.com' : 'hello@yourdomain.com'} /></div>
           <div><Label hint="(optional)">From name</Label><Input value={form.from_name} onChange={(e) => setForm({ ...form, from_name: e.target.value })} placeholder="Amin from Mavan" /></div>
           <div><Label>{add === 'gmail' ? 'App Password' : 'API key'}</Label><Input type="password" autoComplete="off" value={form.secret} onChange={(e) => setForm({ ...form, secret: e.target.value })} placeholder={add === 'gmail' ? 'xxxx xxxx xxxx xxxx' : 're_…'} /></div>
-          <div><Label hint="after warm-up">Daily limit</Label><Input type="number" min={1} max={500} value={form.daily_cap} onChange={(e) => setForm({ ...form, daily_cap: Number(e.target.value) })} /></div>
+          <div><Label hint={form.warmed_up ? '' : 'after warm-up'}>Daily limit</Label><Input type="number" min={1} max={500} value={form.daily_cap} onChange={(e) => setForm({ ...form, daily_cap: Number(e.target.value) })} /></div>
         </div>
+        <label className="mt-4 flex items-start gap-2 rounded-lg border border-line p-3 text-sm">
+          <input type="checkbox" className="mt-0.5 accent-brand-600" checked={form.warmed_up} onChange={(e) => setForm({ ...form, warmed_up: e.target.checked })} />
+          <span><b>Already warmed up</b><br /><span className="text-muted">Skip the slow start (10, 20, 30 a day over 3 weeks) and use the full daily limit from today. Only tick this if the {add === 'resend' ? 'domain' : 'inbox'} already has a good sending history.</span></span>
+        </label>
       </Modal>
     </div>
   );

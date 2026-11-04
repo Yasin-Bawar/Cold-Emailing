@@ -207,7 +207,7 @@ api.post('/suppression/remove', async (req, res) => res.json({ removed: await re
 api.get('/accounts', async (_req, res) => res.json(await repo.listAccounts()));
 api.post('/accounts', async (req, res) => res.json(await repo.addAccount(AccountInput.parse(req.body))));
 api.patch('/accounts/:id', async (req, res) => {
-  const b = z.object({ from_name: z.string().max(120).nullish(), daily_cap: z.number().int().min(1).max(500).optional(), status: z.enum(['active', 'paused']).optional(), secret: z.string().min(8).max(500).optional() }).parse(req.body);
+  const b = z.object({ from_name: z.string().max(120).nullish(), daily_cap: z.number().int().min(1).max(500).optional(), status: z.enum(['active', 'paused']).optional(), secret: z.string().min(8).max(500).optional(), warmed_up: z.boolean().optional() }).parse(req.body);
   res.json(await repo.updateAccount(uuid.parse(req.params.id), b));
 });
 api.delete('/accounts/:id', async (req, res) => { await repo.deleteAccount(uuid.parse(req.params.id)); res.json({ ok: true }); });

@@ -114,3 +114,18 @@ describe('inbox', () => {
     expect(stripQuoted('Sounds good, call me.\n\nOn Tue, Nov 3, 2026 at 10:00 AM Mavan <a@b.c> wrote:\n> Hi there')).toBe('Sounds good, call me.');
   });
 });
+
+import { accountDayStart, nextDayStart, warmupDays } from '../src/core/caps.ts';
+describe('per-provider days and warm-up', () => {
+  it('counts Resend days in UTC and others in Toronto', () => {
+    const t = new Date('2026-11-04T02:30:00Z'); // Nov 3, 21:30 in Toronto
+    expect(accountDayStart('resend', t).toISOString()).toBe('2026-11-04T00:00:00.000Z');
+    expect(accountDayStart('gmail_api', t).toISOString()).toBe('2026-11-03T05:00:00.000Z');
+    expect(nextDayStart('resend', t).toISOString()).toBe('2026-11-05T00:00:00.000Z');
+    expect(nextDayStart('gmail', t).toISOString()).toBe('2026-11-04T05:00:00.000Z');
+  });
+  it('treats an account started 28 days ago as warmed up', () => {
+    expect(warmupDays('2026-10-07', new Date('2026-11-04T12:00:00Z'))).toBe(28);
+    expect(warmupCap(100, '2026-10-07', new Date('2026-11-04T12:00:00Z'))).toBe(100);
+  });
+});

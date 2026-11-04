@@ -3,7 +3,7 @@ import { randomUUID } from 'node:crypto';
 import { db } from './db.ts';
 import { decrypt, unsubToken } from './crypto.ts';
 import { env } from './env.ts';
-import { dayStart, nextGapMs, warmupCap } from './caps.ts';
+import { accountDayStart, nextDayStart, nextGapMs, warmupCap } from './caps.ts';
 import { localTime, DEFAULT_TZ } from './window.ts';
 import { compose } from './compose.ts';
 import { getFile, contentTypeFor } from './storage.ts';
@@ -43,10 +43,10 @@ export const sendTick = async (now = new Date(), makeSender: (a: AccountRow) => 
   const accounts = (await sql`select * from accounts where status = 'active' and (next_send_at is null or next_send_at <= ${now})`) as unknown as AccountRow[];
   const activeIds = (await sql`select id from accounts where status = 'active'`).map((r) => r.id as string);
   const firstGmail = (await sql`select email from accounts where provider in ('gmail', 'gmail_api') and status <> 'error' order by created_at limit 1`)[0]?.email as string | undefined;
-  const since = dayStart(now);
   const results: SendOutcome[] = [];
 
   for (const acc of shuffle(accounts)) {
+    const since = accountDayStart(acc.provider, now);
     const [{ n }] = await sql`select count(*)::int as n from emails where account_id = ${acc.id} and status = 'sent' and sent_at >= ${since}`;
     const cap = warmupCap(acc.daily_cap, acc.warmup_start, now);
     if (n >= cap) { results.push({ account: acc.email, held: `daily limit reached (${n}/${cap})` }); continue; }
@@ -118,6 +118,19 @@ export const sendTick = async (now = new Date(), makeSender: (a: AccountRow) => 
       results.push({ account: acc.email, email_id: pick.id as string, to: pick.lead_email as string, ok: true });
     } catch (e) {
       const msg = String((e as Error)?.message || e).slice(0, 500);
+      // The provider says this inbox hit its limit (e.g. Resend's 100 a day): not the email's fault and not a broken account.
+      // Put the email back in the queue and rest the inbox until its next day (or an hour, for a short rate limit).
+      const status = (e as any)?.status;
+      const quota = /daily_quota|monthly_quota|quota_exceeded|daily user sending limit|sending limit exceeded/i.test(msg);
+      const rate = status === 429 || /rate_limit|too many requests/i.test(msg);
+      if (quota || rate) {
+        const until = quota && !/monthly/i.test(msg) ? nextDayStart(acc.provider, now) : new Date(now.getTime() + (quota ? 24 : 1) * 3_600_000);
+        await sql`update emails set status = 'approved', account_id = null, claimed_at = null where id = ${pick.id}`;
+        await sql`update accounts set next_send_at = ${until}, last_error = ${'Limit reached, resting until ' + until.toISOString() + ': ' + msg} where id = ${acc.id}`;
+        await logEvent('send_limited', { to: pick.lead_email, error: msg, from: acc.email, until: until.toISOString() }, { lead_id: pick.lead_id as string, email_id: pick.id as string, account_id: acc.id });
+        results.push({ account: acc.email, email_id: pick.id as string, held: `limit reached, resting until ${until.toISOString()}` });
+        continue;
+      }
       const streak = acc.fail_streak + 1;
       await sql`update emails set status = 'failed', error = ${msg} where id = ${pick.id}`;
       await sql`update accounts set fail_streak = ${streak}, last_error = ${msg}, status = ${streak >= 3 ? 'error' : 'active'},

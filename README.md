@@ -3,7 +3,7 @@
 A free, self-hosted cold-email platform. Connect Gmail or Resend inboxes, keep every lead in one place, review a custom-designed email for each lead, and let the worker send them slowly and safely. Claude connects through **MCP**, so it can create campaigns, add leads, write each email (HTML + image) and read the replies.
 
 - **Dashboard** (Prospeo-style): Home stats, People search with filters and bulk actions, Lists, Replies, Campaigns with a live email preview and Approve/Skip/Edit, Activity, Sending accounts, Suppression, Settings, API & MCP.
-- **Sending worker**: weekdays 8am–5pm in each lead's own time zone, warm-up (10 → 20 → 30 → your daily limit per inbox), a random 1–4 minute gap between sends, one-click unsubscribe headers, postal address in every footer, follow-ups in the same thread.
+- **Sending worker**: weekdays 8am–5pm in each lead's own time zone, warm-up (10 → 20 → 30 → your daily limit per inbox; tick **Already warmed up** to skip it), a random 1–4 minute gap between sends, one-click unsubscribe headers, postal address in every footer, follow-ups in the same thread.
 - **Inbox check**: reads the Gmail inbox every 10 minutes. A reply marks the lead *replied* and cancels its follow-ups. "No thanks" / "unsubscribe" replies and bounces go on the never-email list.
 - **Gmail via Google sign-in** (Gmail API over HTTPS, works on Railway's cheaper plans that block SMTP), Gmail App Password (SMTP/IMAP) or Resend.
 - **MCP server** at `/mcp`: 19 tools for Claude (see below). Claude can draft, queue and approve; only the worker sends, always within the limits above.
@@ -45,7 +45,7 @@ Keep each new inbox at the default 40/day limit after warm-up. More inboxes = mo
 
 **Gmail with App Password** (SMTP + IMAP) is still there for running locally or on a host that allows SMTP: turn on 2-Step Verification, create an App Password at <https://myaccount.google.com/apppasswords>, and add it under **Sending accounts → Gmail with App Password**.
 
-Resend works too (**Add Resend**, HTTPS, fine on Railway): it needs a domain verified in Resend, and its free plan allows 100/day. Its terms don't allow purchased or scraped lists, so Gmail is the main cold sender here. Replies to Resend emails go to your first Gmail inbox (or the reply-to in Settings), so they're still tracked.
+Resend works too (**Add Resend**, HTTPS, fine on Railway): it needs a domain verified in Resend, and its free plan allows 100/day and 3,000/month (set the daily limit to 100; the platform counts Resend's day in UTC like Resend does, and if Resend still answers "quota exceeded" the email waits for the next day instead of failing). Its terms don't allow purchased or scraped lists, so Gmail is the main cold sender here. Replies to Resend emails go to your first Gmail inbox (or the reply-to in Settings), so they're still tracked.
 
 ## 3. Railway (backend)
 

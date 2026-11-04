@@ -20,3 +20,18 @@ export const dayStart = (now = new Date(), tz = 'America/Toronto'): Date => {
   const offset = asUtc - Math.floor(now.getTime() / 1000) * 1000;
   return new Date(Date.UTC(+p.year, +p.month - 1, +p.day) - offset);
 };
+
+// Resend counts its daily limit by UTC day; everything else counts by the sender's day in Toronto.
+export const dayZone = (provider: string) => (provider === 'resend' ? 'UTC' : 'America/Toronto');
+export const accountDayStart = (provider: string, now = new Date()) => dayStart(now, dayZone(provider));
+export const nextDayStart = (provider: string, now = new Date()) => {
+  const start = accountDayStart(provider, now);
+  return accountDayStart(provider, new Date(start.getTime() + 26 * 3_600_000)); // +26h lands in the next day even across DST
+};
+
+// An account is "warming up" for its first 21 days. "Already warmed up" accounts start 28 days in the past.
+export const WARMUP_DAYS = 21;
+export const warmupDays = (warmupStart: Date | string, now = new Date()) => {
+  const s = new Date(warmupStart);
+  return Math.floor((Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()) - Date.UTC(s.getUTCFullYear(), s.getUTCMonth(), s.getUTCDate())) / 86_400_000);
+};
