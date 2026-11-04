@@ -17,7 +17,7 @@ export const Lists = () => {
   };
   return (
     <div>
-      <PageHeader title="Lists" sub="Group leads any way you like. Select leads on People and choose Add to list." right={<Button variant="primary" icon={<Plus className="size-4" />} onClick={() => setOpen(true)}>New list</Button>} />
+      <PageHeader icon={<ListChecks className="size-5" />} tint="bg-violet-100 text-violet-700" title="Lists" sub="Group leads any way you like. Select leads on People and choose Add to list." right={<Button variant="primary" icon={<Plus className="size-4" />} onClick={() => setOpen(true)}>New list</Button>} />
       {!lists.data ? <Spinner /> : lists.data.length === 0 ? (
         <Card><Empty icon={<ListChecks className="size-5" />} title="No lists yet" sub="Lists help you pick who gets which campaign." action={<Button variant="primary" onClick={() => setOpen(true)}>New list</Button>} /></Card>
       ) : (
@@ -50,7 +50,7 @@ export const Replies = () => {
   const rows = (replies.data || []).filter((r) => !filter || r.status === filter);
   return (
     <div>
-      <PageHeader title="Replies" sub="Every lead who wrote back. Their follow-ups were cancelled automatically." />
+      <PageHeader icon={<Inbox className="size-5" />} tint="bg-emerald-100 text-emerald-700" title="Replies" sub="Every lead who wrote back. Their follow-ups were cancelled automatically." />
       <div className="mb-4 flex flex-wrap gap-1.5">
         {['', 'replied', 'interested', 'won', 'lost', 'unsubscribed'].map((s) => (
           <button key={s} onClick={() => setFilter(s)} className={cx('rounded-full border px-3 py-1 text-[13px] font-medium capitalize', filter === s ? 'border-brand-500 bg-brand-50 text-brand-700' : 'border-line bg-white text-gray-600 hover:bg-gray-50')}>{s || 'All'}</button>
@@ -95,7 +95,7 @@ export const Activity = () => {
   const act = useLoad(() => api<any[]>(`/activity${qs({ type, limit: 50, offset })}`), [type, offset]);
   return (
     <div>
-      <PageHeader title="Activity" sub="Everything the platform, the worker and Claude did." />
+      <PageHeader icon={<ActivityIcon className="size-5" />} tint="bg-amber-100 text-amber-700" title="Activity" sub="Everything the platform, the worker and Claude did." />
       <div className="mb-4 flex flex-wrap gap-1.5">
         {[['', 'All'], ['sent', 'Sent'], ['replied', 'Replies'], ['bounced', 'Bounces'], ['unsubscribed', 'Unsubscribes'], ['send_failed', 'Failures'], ['email_added,email_replaced', 'Drafts'], ['emails_approved', 'Approvals']].map(([v, l]) => (
           <button key={v} onClick={() => { setType(v); setOffset(0); }} className={cx('rounded-full border px-3 py-1 text-[13px] font-medium', type === v ? 'border-brand-500 bg-brand-50 text-brand-700' : 'border-line bg-white text-gray-600 hover:bg-gray-50')}>{l}</button>
@@ -139,7 +139,7 @@ export const Suppression = () => {
   };
   return (
     <div>
-      <PageHeader title="Suppression" sub="Addresses that are never emailed: unsubscribes, bounces and manual excludes. Checked before every send." right={<Button variant="primary" icon={<Plus className="size-4" />} onClick={() => setOpen(true)}>Add addresses</Button>} />
+      <PageHeader icon={<Ban className="size-5" />} tint="bg-rose-100 text-rose-700" title="Suppression" sub="Addresses that are never emailed: unsubscribes, bounces and manual excludes. Checked before every send." right={<Button variant="primary" icon={<Plus className="size-4" />} onClick={() => setOpen(true)}>Add addresses</Button>} />
       <Card>
         <div className="border-b border-line p-3"><div className="relative max-w-sm"><Search className="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-gray-400" /><Input value={q} onChange={(e) => { setQ(e.target.value); setOffset(0); }} placeholder="Search addresses" className="h-8 pl-8 text-[13px]" /></div></div>
         {!list.data ? <div className="grid h-40 place-items-center"><Spinner /></div> : list.data.rows.length === 0 ? <Empty icon={<Ban className="size-5" />} title="The list is empty" /> : (

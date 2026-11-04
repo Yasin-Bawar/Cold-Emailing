@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router';
-import { Mail, Plus, Trash2, Pause, Play, PlugZap, CheckCircle2, XCircle, KeyRound, Copy, Terminal, ShieldCheck, Sparkles, Info } from 'lucide-react';
+import { Mail, Plus, Trash2, Pause, Play, PlugZap, CheckCircle2, XCircle, KeyRound, Copy, Terminal, ShieldCheck, Sparkles, Info , Settings as SettingsIcon } from 'lucide-react';
 import { api, fmtDate, timeAgo } from '../api.ts';
 import { Button, Card, CardHeader, Empty, Input, Label, Modal, PageHeader, Spinner, StatusChip, Textarea, cx, useLoad, useToast } from '../ui.tsx';
 import { copy } from './util.ts';
@@ -47,7 +47,7 @@ export const Accounts = () => {
 
   return (
     <div>
-      <PageHeader title="Sending accounts" sub="Inboxes the worker sends from. New inboxes warm up: 10 a day in week 1, 20 in week 2, 30 in week 3, then their daily limit."
+      <PageHeader icon={<Mail className="size-5" />} tint="bg-teal-100 text-teal-700" title="Sending accounts" sub="Inboxes the worker sends from. New inboxes warm up: 10 a day in week 1, 20 in week 2, 30 in week 3, then their daily limit."
         right={<><Button icon={<Plus className="size-4" />} onClick={() => openAdd('resend')}>Add Resend</Button><Button icon={<Plus className="size-4" />} onClick={() => openAdd('gmail')}>Gmail with App Password</Button><Button variant="primary" icon={<Plus className="size-4" />} onClick={connectGoogle}>Connect Gmail</Button></>} />
       {accounts.data && accounts.data.some((a) => a.provider === 'resend') && !accounts.data.some((a) => a.provider !== 'resend' && a.status !== 'error') && (
         <div className="mb-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
@@ -162,7 +162,7 @@ export const SettingsPage = () => {
   };
   return (
     <div className="max-w-3xl">
-      <PageHeader title="Settings" />
+      <PageHeader icon={<SettingsIcon className="size-5" />} tint="bg-slate-100 text-slate-700" title="Settings" />
       <Card className="mb-5">
         <div className="flex flex-wrap items-center justify-between gap-4 p-5">
           <div>
@@ -212,7 +212,7 @@ export const McpPage = () => {
   );
   return (
     <div className="max-w-4xl">
-      <PageHeader title="API & MCP" sub="Connect Claude so it can create campaigns, add leads, write a custom email for each one, and read replies." />
+      <PageHeader icon={<KeyRound className="size-5" />} tint="bg-purple-100 text-purple-700" title="API & MCP" sub="Connect Claude so it can create campaigns, add leads, write a custom email for each one, and read replies." />
       <div className="grid gap-5">
         <Card className="p-5">
           <div className="flex items-start gap-3">

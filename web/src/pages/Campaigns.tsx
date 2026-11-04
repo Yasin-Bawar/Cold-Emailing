@@ -147,6 +147,8 @@ export const Campaigns = () => {
   return (
     <div>
       <PageHeader
+        icon={<Building2 className="size-5" />}
+        tint="bg-orange-100 text-orange-700"
         title="Campaigns"
         sub="Each campaign holds leads and one custom email per lead (plus follow-ups)."
         right={

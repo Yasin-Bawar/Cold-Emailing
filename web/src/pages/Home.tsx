@@ -1,5 +1,5 @@
 import { Link, useNavigate } from 'react-router';
-import { Send, MessageSquareReply, Clock, MoreHorizontal, AlertTriangle, Mail, Eye } from 'lucide-react';
+import { Send, MessageSquareReply, Clock, MoreHorizontal, AlertTriangle, Mail, Eye , Home as HomeIcon } from 'lucide-react';
 import { api, fmtDate, type Campaign } from '../api.ts';
 import { SenderStatus } from './SenderStatus.tsx';
 import { Card, CardHeader, Delta, Empty, PageHeader, Spinner, StatusChip, useLoad, Button } from '../ui.tsx';
@@ -36,7 +36,7 @@ export const Home = () => {
 
   return (
     <div>
-      <PageHeader title="Welcome back" sub="Here's how your outreach is doing over the last 14 days." />
+      <PageHeader icon={<HomeIcon className="size-5" />} tint="bg-indigo-100 text-indigo-700" title="Welcome back" sub="Here's how your outreach is doing over the last 14 days." />
       <SenderStatus className="mb-5" />
 
       {(!q.postal_address_set || q.paused || !q.accounts.length) && (

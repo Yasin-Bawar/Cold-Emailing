@@ -15,6 +15,8 @@ export const Designs = () => {
   return (
     <div>
       <PageHeader
+        icon={<LayoutTemplate className="size-5" />}
+        tint="bg-pink-100 text-pink-700"
         title="Designs"
         sub="10 designs for each business type. When emails are generated, only the words change: business name, city, a personal line, rating."
       />

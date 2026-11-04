@@ -1,5 +1,5 @@
 import { createContext, useCallback, useContext, useEffect, useState, type ButtonHTMLAttributes, type InputHTMLAttributes, type ReactNode } from 'react';
-import { ChevronLeft, ChevronRight, Loader2, X, CheckCircle2, AlertCircle } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Loader2, X, CheckCircle2, AlertCircle, Circle, Clock, Send, MessageCircle, Star, Trophy, MinusCircle, BellOff, AlertTriangle, PencilLine, PauseCircle, PlayCircle } from 'lucide-react';
 
 export const cx = (...c: (string | false | null | undefined)[]) => c.filter(Boolean).join(' ');
 
@@ -9,11 +9,11 @@ export const Button = ({ variant = 'secondary', size = 'md', loading, icon, clas
     {...p}
     disabled={disabled || loading}
     className={cx(
-      'inline-flex items-center justify-center gap-1.5 rounded-lg font-medium whitespace-nowrap transition disabled:opacity-50 disabled:cursor-not-allowed focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500',
-      size === 'sm' ? 'h-8 px-3 text-[13px]' : 'h-9 px-3.5 text-sm',
-      variant === 'primary' && 'bg-brand-600 text-white shadow-sm hover:bg-brand-700',
-      variant === 'secondary' && 'bg-white text-ink border border-line shadow-[0_1px_2px_rgba(16,24,40,.05)] hover:bg-gray-50',
-      variant === 'ghost' && 'text-muted hover:bg-gray-100 hover:text-ink',
+      'inline-flex items-center justify-center gap-1.5 rounded-xl font-semibold whitespace-nowrap transition disabled:opacity-45 disabled:cursor-not-allowed focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500',
+      size === 'sm' ? 'h-8 px-3 text-[13px]' : 'h-10 px-4 text-sm',
+      variant === 'primary' && 'bg-brand-600 text-white shadow-[0_1px_2px_rgba(73,67,193,.25)] hover:bg-brand-700',
+      variant === 'secondary' && 'bg-white text-ink border border-line hover:border-gray-300 hover:bg-soft',
+      variant === 'ghost' && 'text-muted hover:bg-brand-50 hover:text-brand-700',
       variant === 'danger' && 'bg-white text-red-600 border border-red-200 hover:bg-red-50',
       className,
     )}
@@ -24,13 +24,13 @@ export const Button = ({ variant = 'secondary', size = 'md', loading, icon, clas
 );
 
 export const Card = ({ className, children }: { className?: string; children: ReactNode }) => (
-  <div className={cx('rounded-xl border border-line bg-white shadow-[0_1px_2px_rgba(16,24,40,.04)]', className)}>{children}</div>
+  <div className={cx('rounded-2xl border border-line bg-white shadow-[0_1px_3px_rgba(29,32,51,.04)]', className)}>{children}</div>
 );
 
 export const CardHeader = ({ title, sub, right }: { title: ReactNode; sub?: ReactNode; right?: ReactNode }) => (
   <div className="flex items-start justify-between gap-3 px-5 pt-4 pb-3">
     <div className="min-w-0">
-      <h3 className="text-[15px] font-semibold text-ink">{title}</h3>
+      <h3 className="text-[15px] font-bold text-ink">{title}</h3>
       {sub && <p className="mt-0.5 text-[13px] text-muted">{sub}</p>}
     </div>
     {right}
@@ -38,15 +38,15 @@ export const CardHeader = ({ title, sub, right }: { title: ReactNode; sub?: Reac
 );
 
 export const Input = ({ className, ...p }: InputHTMLAttributes<HTMLInputElement>) => (
-  <input {...p} className={cx('h-9 w-full rounded-lg border border-line bg-white px-3 text-sm text-ink placeholder:text-gray-400 shadow-[0_1px_2px_rgba(16,24,40,.04)] outline-none focus:border-brand-500 focus:ring-4 focus:ring-brand-100', className)} />
+  <input {...p} className={cx('h-10 w-full rounded-xl border border-line bg-white px-3.5 text-sm text-ink placeholder:text-gray-400 outline-none transition focus:border-brand-500 focus:ring-4 focus:ring-brand-100', className)} />
 );
 
 export const Textarea = ({ className, ...p }: React.TextareaHTMLAttributes<HTMLTextAreaElement>) => (
-  <textarea {...p} className={cx('w-full rounded-lg border border-line bg-white px-3 py-2 text-sm text-ink placeholder:text-gray-400 outline-none focus:border-brand-500 focus:ring-4 focus:ring-brand-100', className)} />
+  <textarea {...p} className={cx('w-full rounded-xl border border-line bg-white px-3.5 py-2.5 text-sm text-ink placeholder:text-gray-400 outline-none focus:border-brand-500 focus:ring-4 focus:ring-brand-100', className)} />
 );
 
 export const Select = ({ className, children, ...p }: React.SelectHTMLAttributes<HTMLSelectElement>) => (
-  <select {...p} className={cx('h-9 rounded-lg border border-line bg-white px-2.5 text-sm text-ink outline-none focus:border-brand-500 focus:ring-4 focus:ring-brand-100', className)}>{children}</select>
+  <select {...p} className={cx('h-10 rounded-xl border border-line bg-white px-3 text-sm text-ink outline-none focus:border-brand-500 focus:ring-4 focus:ring-brand-100', className)}>{children}</select>
 );
 
 export const Label = ({ children, hint }: { children: ReactNode; hint?: ReactNode }) => (
@@ -68,34 +68,51 @@ export const Checkbox = ({ checked, indeterminate, onChange, label }: { checked:
   />
 );
 
-const STATUS_STYLE: Record<string, string> = {
-  new: 'bg-gray-100 text-gray-700',
-  queued: 'bg-indigo-50 text-indigo-700',
-  sent: 'bg-sky-50 text-sky-700',
-  replied: 'bg-emerald-50 text-emerald-700',
-  interested: 'bg-teal-50 text-teal-700',
-  won: 'bg-green-100 text-green-800',
-  lost: 'bg-gray-100 text-gray-500',
-  unsubscribed: 'bg-amber-50 text-amber-700',
-  bounced: 'bg-red-50 text-red-700',
-  draft: 'bg-gray-100 text-gray-700',
-  approved: 'bg-indigo-50 text-indigo-700',
-  sending: 'bg-sky-50 text-sky-700',
-  failed: 'bg-red-50 text-red-700',
-  cancelled: 'bg-gray-100 text-gray-500',
-  skipped: 'bg-gray-100 text-gray-500',
-  active: 'bg-emerald-50 text-emerald-700',
-  paused: 'bg-amber-50 text-amber-700',
-  done: 'bg-green-100 text-green-800',
-  error: 'bg-red-50 text-red-700',
-  complete: 'bg-green-100 text-green-800',
+// One meaning per color, everywhere: grey = not started, blue = waiting, indigo = sent, green = good news,
+// amber = needs a look, red = problem. Every status also has its own icon and word, so color is never the only cue.
+type Tone = 'grey' | 'violet' | 'blue' | 'indigo' | 'green' | 'teal' | 'amber' | 'red';
+export const TONE: Record<Tone, string> = {
+  grey: 'bg-gray-100 text-gray-600 ring-gray-200',
+  violet: 'bg-violet-50 text-violet-700 ring-violet-200',
+  blue: 'bg-sky-50 text-sky-700 ring-sky-200',
+  indigo: 'bg-brand-50 text-brand-700 ring-brand-200',
+  green: 'bg-emerald-50 text-emerald-700 ring-emerald-200',
+  teal: 'bg-teal-50 text-teal-700 ring-teal-200',
+  amber: 'bg-amber-50 text-amber-800 ring-amber-200',
+  red: 'bg-red-50 text-red-700 ring-red-200',
 };
-export const StatusChip = ({ status, label }: { status: string; label?: string }) => (
-  <span className={cx('inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium capitalize', STATUS_STYLE[status] || 'bg-gray-100 text-gray-700')}>
-    <span className="size-1.5 rounded-full bg-current opacity-70" />
-    {label || status}
-  </span>
-);
+const S = (tone: Tone, Icon: typeof Circle, label?: string) => ({ tone, Icon, label });
+export const STATUS = {
+  new: S('grey', Circle, 'New'),
+  queued: S('blue', Clock, 'Queued'),
+  sent: S('indigo', Send, 'Sent'),
+  replied: S('green', MessageCircle, 'Replied'),
+  interested: S('teal', Star, 'Interested'),
+  won: S('green', Trophy, 'Won'),
+  lost: S('grey', MinusCircle, 'Lost'),
+  unsubscribed: S('amber', BellOff, 'Unsubscribed'),
+  bounced: S('red', AlertTriangle, 'Bounced'),
+  draft: S('violet', PencilLine, 'Draft'),
+  approved: S('blue', Clock, 'Queued'),
+  sending: S('indigo', Send, 'Sending'),
+  failed: S('red', AlertTriangle, 'Failed'),
+  cancelled: S('grey', MinusCircle, 'Cancelled'),
+  skipped: S('grey', MinusCircle, 'Skipped'),
+  active: S('green', PlayCircle, 'Active'),
+  paused: S('amber', PauseCircle, 'Paused'),
+  done: S('green', CheckCircle2, 'Done'),
+  error: S('red', AlertTriangle, 'Error'),
+  complete: S('green', CheckCircle2, 'Complete'),
+} as Record<string, { tone: Tone; Icon: typeof Circle; label?: string }>;
+export const StatusChip = ({ status, label }: { status: string; label?: string }) => {
+  const st = STATUS[status] || { tone: 'grey' as Tone, Icon: Circle };
+  return (
+    <span className={cx('inline-flex shrink-0 items-center gap-1 rounded-full px-2 py-0.5 text-xs font-semibold ring-1 ring-inset', TONE[st.tone])}>
+      <st.Icon className="size-3" strokeWidth={2.4} />
+      {label || st.label || status}
+    </span>
+  );
+};
 
 export const Delta = ({ cur, prev }: { cur: number; prev: number }) => {
   if (!prev && !cur) return <span className="text-xs text-muted">—</span>;
@@ -108,8 +125,8 @@ export const Spinner = ({ className }: { className?: string }) => <Loader2 class
 
 export const Empty = ({ icon, title, sub, action }: { icon?: ReactNode; title: string; sub?: ReactNode; action?: ReactNode }) => (
   <div className="flex flex-col items-center justify-center px-6 py-14 text-center">
-    {icon && <div className="mb-3 grid size-11 place-items-center rounded-full bg-brand-50 text-brand-600">{icon}</div>}
-    <p className="font-semibold text-ink">{title}</p>
+    {icon && <div className="mb-3 grid size-12 place-items-center rounded-2xl bg-brand-50 text-brand-600">{icon}</div>}
+    <p className="text-[15px] font-bold text-ink">{title}</p>
     {sub && <p className="mt-1 max-w-sm text-sm text-muted">{sub}</p>}
     {action && <div className="mt-4">{action}</div>}
   </div>
@@ -219,11 +236,14 @@ export const useLoad = <T,>(fn: () => Promise<T>, deps: unknown[]) => {
   return { data, error, loading, reload: () => setTick((t) => t + 1), setData };
 };
 
-export const PageHeader = ({ title, sub, right }: { title: string; sub?: ReactNode; right?: ReactNode }) => (
-  <div className="mb-5 flex flex-wrap items-end justify-between gap-3">
-    <div>
-      <h1 className="text-xl font-semibold tracking-tight text-ink">{title}</h1>
-      {sub && <p className="mt-1 text-sm text-muted">{sub}</p>}
+export const PageHeader = ({ title, sub, right, icon, tint }: { title: string; sub?: ReactNode; right?: ReactNode; icon?: ReactNode; tint?: string }) => (
+  <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
+    <div className="flex min-w-0 items-center gap-3.5">
+      {icon && <span className={cx('grid size-11 shrink-0 place-items-center rounded-2xl', tint || 'bg-white text-brand-600 ring-1 ring-line')}>{icon}</span>}
+      <div className="min-w-0">
+        <h1 className="text-2xl font-extrabold tracking-tight text-ink">{title}</h1>
+        {sub && <p className="mt-0.5 text-sm text-muted">{sub}</p>}
+      </div>
     </div>
     {right && <div className="flex flex-wrap items-center gap-2">{right}</div>}
   </div>
@@ -231,7 +251,7 @@ export const PageHeader = ({ title, sub, right }: { title: string; sub?: ReactNo
 
 export const Avatar = ({ name, className }: { name: string; className?: string }) => {
   const initials = (name || '?').replace(/[^A-Za-z0-9 ]/g, '').split(/\s+/).filter(Boolean).slice(0, 2).map((w) => w[0]).join('').toUpperCase() || '?';
-  const hues = ['bg-blue-100 text-blue-700', 'bg-violet-100 text-violet-700', 'bg-amber-100 text-amber-800', 'bg-emerald-100 text-emerald-700', 'bg-rose-100 text-rose-700', 'bg-cyan-100 text-cyan-800'];
+  const hues = ['bg-sky-100 text-sky-800', 'bg-violet-100 text-violet-800', 'bg-amber-100 text-amber-800', 'bg-emerald-100 text-emerald-800', 'bg-rose-100 text-rose-800', 'bg-teal-100 text-teal-800', 'bg-indigo-100 text-indigo-800', 'bg-orange-100 text-orange-800'];
   const h = hues[[...(name || '')].reduce((a, c) => a + c.charCodeAt(0), 0) % hues.length];
-  return <span className={cx('grid size-8 shrink-0 place-items-center rounded-lg text-xs font-semibold', h, className)}>{initials}</span>;
+  return <span className={cx('grid size-9 shrink-0 place-items-center rounded-xl text-xs font-bold', h, className)}>{initials}</span>;
 };
