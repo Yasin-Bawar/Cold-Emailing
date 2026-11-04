@@ -126,7 +126,8 @@ export const Campaigns = () => {
   const [bulk, setBulk] = useState(false);
   const [showFilter, setShowFilter] = useState(false);
   const [minSent, setMinSent] = useState('');
-  const [hidden, setHidden] = useState<Set<string>>(new Set());
+  // Drafts and queued are in the progress bar already; they can be shown again with Edit columns
+  const [hidden, setHidden] = useState<Set<string>>(new Set(['drafts', 'queued', 'created']));
   const [colsOpen, setColsOpen] = useState(false);
   const [deleting, setDeleting] = useState<Campaign | null>(null);
   const toast = useToast();
@@ -200,9 +201,10 @@ export const Campaigns = () => {
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full min-w-[820px] text-sm">
-              <thead className="bg-gray-50/60 text-left text-xs text-muted">
+              <thead className="text-left text-[11px] font-bold tracking-wider text-gray-400 uppercase">
                 <tr>
                   <th className="px-4 py-2.5 font-medium">Name</th>
+                  <th className="px-4 py-2.5 font-medium">Progress</th>
                   {COLS.filter((c) => show(c.id)).map((c) => <th key={c.id} className="px-4 py-2.5 font-medium">{c.label}</th>)}
                   <th className="px-4 py-2.5 font-medium">Status</th>
                   <th />
@@ -210,12 +212,20 @@ export const Campaigns = () => {
               </thead>
               <tbody className="divide-y divide-line">
                 {rows.map((c) => (
-                  <tr key={c.id} className="cursor-pointer hover:bg-gray-50/70" onClick={() => nav(`/campaigns/${c.id}`)}>
+                  <tr key={c.id} className="cursor-pointer transition hover:bg-soft" onClick={() => nav(`/campaigns/${c.id}`)}>
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-3">
-                        <span className="grid size-8 place-items-center rounded-lg bg-brand-50 text-xs font-bold text-brand-700">{c.name.slice(0, 2).toUpperCase()}</span>
-                        <div><div className="font-medium">{c.name}</div>{c.notes && <div className="max-w-xs truncate text-xs text-muted">{c.notes}</div>}</div>
+                        <span className="grid size-9 place-items-center rounded-xl bg-orange-100 text-xs font-bold text-orange-800">{c.name.replace(/[^A-Za-z0-9 ]/g, '').split(/\s+/).filter(Boolean).slice(0, 2).map((w) => w[0]).join('').toUpperCase()}</span>
+                        <div><div className="font-semibold text-ink">{c.name}</div><div className="max-w-xs truncate text-xs text-muted">Created {fmtDate(c.created_at)}{c.notes ? ` · ${c.notes}` : ''}</div></div>
                       </div>
+                    </td>
+                    <td className="px-4 py-3">
+                      <div className="flex h-2 w-36 overflow-hidden rounded-full bg-gray-100" title={`${c.sent} sent · ${c.queued} waiting · ${c.drafts} drafts`}>
+                        <span className="bg-brand-600" style={{ width: `${(c.sent / Math.max(1, c.emails || c.leads)) * 100}%` }} />
+                        <span className="bg-sky-300" style={{ width: `${(c.queued / Math.max(1, c.emails || c.leads)) * 100}%` }} />
+                        <span className="bg-violet-200" style={{ width: `${(c.drafts / Math.max(1, c.emails || c.leads)) * 100}%` }} />
+                      </div>
+                      <p className="mt-1 text-xs text-muted tabular-nums">{c.emails ? `${Math.round((c.sent / c.emails) * 100)}% sent` : 'No emails yet'}</p>
                     </td>
                     {show('leads') && <td className="px-4 py-3 tabular-nums">{c.leads}</td>}
                     {show('drafts') && <td className="px-4 py-3 tabular-nums">{c.drafts}</td>}
