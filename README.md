@@ -6,7 +6,7 @@ A free, self-hosted cold-email platform. Connect Gmail or Resend inboxes, keep e
 - **Sending worker**: weekdays 8am–5pm in each lead's own time zone, warm-up (10 → 20 → 30 → your daily limit per inbox; tick **Already warmed up** to skip it), a random 1–4 minute gap between sends, one-click unsubscribe headers, postal address in every footer, follow-ups in the same thread.
 - **Inbox check**: reads the Gmail inbox every 10 minutes. A reply marks the lead *replied* and cancels its follow-ups. "No thanks" / "unsubscribe" replies and bounces go on the never-email list.
 - **Gmail via Google sign-in** (Gmail API over HTTPS, works on Railway's cheaper plans that block SMTP), Gmail App Password (SMTP/IMAP) or Resend.
-- **MCP server** at `/mcp`: 19 tools for Claude (see below). Claude can draft, queue and approve; only the worker sends, always within the limits above.
+- **MCP server** at `/mcp`: 22 tools for Claude (see below). Claude can draft, queue and approve; only the worker sends, always within the limits above.
 - **Cost**: $0 on Supabase free + Gmail. Railway's trial, then Hobby ($5/month) if you keep it.
 
 ```
@@ -84,6 +84,7 @@ Paste the token only into that command, never into a chat. Then ask Claude thing
 | `add_leads` | up to 1000 at once; duplicates and suppressed addresses are skipped and reported |
 | `add_email`, `add_followup` | save a draft: subject, HTML, text, optional image (base64 or https URL → Supabase Storage) |
 | `list_emails`, `skip_emails` | see and skip drafts |
+| `delete_leads`, `delete_campaign` | remove leads or a whole campaign (needs `confirm: true`; leads already emailed are always kept) |
 | `approve_emails` | queue drafts for sending (more than 100 at once needs `confirm: true`) |
 | `list_leads`, `get_lead`, `update_lead` | search leads, see a lead's emails and reply, set status/notes |
 | `list_replies`, `stats`, `queue_status`, `get_settings` | results and what's waiting |
@@ -120,6 +121,7 @@ On Windows PowerShell, set the two variables first: `$env:OUTREACH_URL="https://
 
 Business types: barbershop, hair salon, nail salon, beauty & spa, tattoo, restaurant, food truck, bakery & café, cleaning, lawn & landscaping, home trades (plumbing, electrical, HVAC), auto repair, fitness, pet grooming.
 
+- **Delete:** on **Campaigns**, the ⋯ menu on a row has Open, Pause/Resume and Delete (optionally with its leads; leads already emailed are kept).
 - **Dashboard:** **Designs** shows all 140. On a campaign, **Generate emails** drafts one for every lead without an email (plus an optional follow-up 4 days later). No two leads in the same city get the same design until all ten are used there.
 - **MCP:** `add_leads` (with `custom`), then `generate_emails`, then `approve_emails`.
 - Photos live in `server/assets/photos/` (Unsplash License, see its `CREDITS.md`) and are served at `<PUBLIC_URL>/photos/...`.

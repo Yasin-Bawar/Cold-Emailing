@@ -5,7 +5,7 @@ import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
 import { z } from 'zod';
 import * as repo from '../core/repo.ts';
-import { LeadInput, LEAD_STATUSES, EMAIL_STATUSES } from '../core/schemas.ts';
+import { LeadInput, LeadFilter, LEAD_STATUSES, EMAIL_STATUSES } from '../core/schemas.ts';
 import { TYPES, listDesigns } from '../templates/index.ts';
 import { generateEmails } from '../core/generate.ts';
 
@@ -225,6 +225,39 @@ export const buildMcpServer = () => {
     description: 'Mark draft or approved emails as skipped so they are never sent.',
     inputSchema: { ids: z.array(z.string().uuid()).min(1).max(5000) },
   }, wrap(async (a: { ids: string[] }) => ({ skipped: await repo.setEmailStatus(a.ids, 'skipped', 'mcp') })));
+
+  s.registerTool('delete_leads', {
+    title: 'Delete leads',
+    description: 'Permanently delete leads (by id or email, or every lead in a campaign) and their unsent emails. Leads that were already emailed are kept, so nobody is emailed twice. Only when the user asked. More than 10 at once needs confirm: true.',
+    inputSchema: { leads: z.array(z.string()).max(5000).optional().describe('Lead ids or emails'), campaign: campaignRef.optional().describe('Delete every lead in this campaign'), confirm: z.boolean().optional() },
+    annotations: { destructiveHint: true },
+  }, wrap(async (a: { leads?: string[]; campaign?: string; confirm?: boolean }) => {
+    let refs = a.leads || [];
+    if (a.campaign) {
+      const c = await resolveCampaign(a.campaign);
+      if (!c) throw new Error('Campaign not found');
+      for (let offset = 0; ; offset += 500) {
+        const page = await repo.searchLeads(LeadFilter.parse({ campaign_id: c.id, limit: 500, offset }));
+        refs = refs.concat(page.rows.map((l: any) => l.id));
+        if (page.rows.length < 500) break;
+      }
+    }
+    if (!refs.length) throw new Error('Give leads or a campaign');
+    if (refs.length > 10 && !a.confirm) return { deleted: 0, would_delete: refs.length, note: 'More than 10 leads. Ask the user, then call again with confirm: true.' };
+    return repo.deleteUncontactedLeads(refs, 'mcp');
+  }));
+
+  s.registerTool('delete_campaign', {
+    title: 'Delete campaign',
+    description: 'Permanently delete a campaign and its unsent emails. With delete_leads, its leads go too (except leads already emailed, which are kept). Only when the user asked; needs confirm: true.',
+    inputSchema: { campaign: campaignRef, delete_leads: z.boolean().default(false), confirm: z.boolean().optional() },
+    annotations: { destructiveHint: true },
+  }, wrap(async (a: { campaign: string; delete_leads?: boolean; confirm?: boolean }) => {
+    const c = await resolveCampaign(a.campaign);
+    if (!c) throw new Error('Campaign not found');
+    if (!a.confirm) return { deleted: false, campaign: c.name, note: 'Ask the user, then call again with confirm: true.' };
+    return repo.deleteCampaign(c.id, { withLeads: !!a.delete_leads, actor: 'mcp' });
+  }));
 
   s.registerTool('list_business_types', {
     title: 'List business types',

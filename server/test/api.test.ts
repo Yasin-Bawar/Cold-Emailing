@@ -62,7 +62,7 @@ d('REST API and MCP server', async () => {
     const c = await mcp();
     const { tools } = await c.listTools();
     const names = tools.map((t: any) => t.name);
-    for (const n of ['create_campaign', 'add_leads', 'add_email', 'add_followup', 'approve_emails', 'queue_status', 'list_replies', 'suppress_email', 'stats', 'pause_sending'])
+    for (const n of ['create_campaign', 'add_leads', 'add_email', 'add_followup', 'approve_emails', 'queue_status', 'list_replies', 'suppress_email', 'stats', 'pause_sending', 'delete_leads', 'delete_campaign'])
       expect(names).toContain(n);
     await c.close();
   });
@@ -142,5 +142,30 @@ d('REST API and MCP server', async () => {
     const bad = await fetch(`${base}/api/campaigns`, { method: 'POST', headers: h, body: '{}' });
     expect(bad.status).toBe(400);
     expect((await bad.json()).error).toMatch(/name/);
+  });
+  it('deletes a campaign with its leads, keeping leads that were already emailed', async () => {
+    const h = { cookie, 'content-type': 'application/json' };
+    const post = async (p: string, b: unknown) => (await fetch(`${base}/api${p}`, { method: 'POST', headers: h, body: JSON.stringify(b) })).json();
+    const camp = await post('/campaigns', { name: 'Delete me' });
+    const up = await post('/leads', { campaign_id: camp.id, leads: [{ email: 'del1@x.com', state: 'TX' }, { email: 'del2@x.com', state: 'TX' }, { email: 'del3@x.com', state: 'TX' }] });
+    const [a, b] = up.created;
+    const e = await post('/emails', { lead_id: a.id, campaign_id: camp.id, step: 0, subject: 'Hi', html: '<p>Hi</p>', text: 'Hi' });
+    await post('/emails', { lead_id: b.id, campaign_id: camp.id, step: 0, subject: 'Hi', html: '<p>Hi</p>', text: 'Hi' });
+    await db()`update emails set status = 'sent', sent_at = now() where id = ${e.id}`;
+    const r = await (await fetch(`${base}/api/campaigns/${camp.id}?leads=1`, { method: 'DELETE', headers: { cookie } })).json();
+    expect(r).toMatchObject({ ok: true, deleted: true, leads_deleted: 2, leads_kept: 1 });
+    const left = await db()`select l.email, l.campaign_id, (select count(*)::int from emails x where x.lead_id = l.id) as emails from leads l where l.email like 'del%@x.com'`;
+    expect(left).toEqual([{ email: 'del1@x.com', campaign_id: null, emails: 1 }]);
+
+    // MCP: delete_leads asks for confirm above 10 and never deletes an emailed lead; delete_campaign needs confirm
+    const c = await mcp();
+    await post('/leads', { leads: [{ email: 'del4@x.com', state: 'TX' }] });
+    const d = await call(c, 'delete_leads', { leads: ['del1@x.com', 'del4@x.com'] });
+    expect(d).toMatchObject({ deleted: 1, kept_contacted: ['del1@x.com'] });
+    const c2 = await post('/campaigns', { name: 'Delete me too' });
+    expect(await call(c, 'delete_campaign', { campaign: 'Delete me too' })).toMatchObject({ deleted: false });
+    expect(await call(c, 'delete_campaign', { campaign: 'Delete me too', confirm: true })).toMatchObject({ deleted: true });
+    expect((await fetch(`${base}/api/campaigns/${c2.id}`, { headers: { cookie } })).status).toBe(404);
+    await c.close();
   });
 });

@@ -90,10 +90,22 @@ export const updateCampaign = async (id: string, patch: { name?: string; notes?:
   return getCampaign(id);
 };
 
-export const deleteCampaign = async (id: string) => {
+// Deletes a campaign and its unsent emails. With withLeads, its leads go too, except any lead that was already
+// emailed: those stay (outside the campaign) so the history is kept and nobody is emailed twice.
+export const deleteCampaign = async (id: string, opts: { withLeads?: boolean; actor?: Actor } = {}) => {
   const sql = db();
-  await sql`delete from emails where campaign_id = ${id} and status <> 'sent'`;
+  const [c] = await sql`select name from campaigns where id = ${id}`;
+  if (!c) return { deleted: false, leads_deleted: 0, leads_kept: 0 };
+  let leads_deleted = 0, leads_kept = 0;
+  await sql`delete from emails where campaign_id = ${id} and status not in ('sent', 'sending')`;
+  if (opts.withLeads) {
+    leads_deleted = (await sql`delete from leads l where l.campaign_id = ${id}
+      and not exists (select 1 from emails e where e.lead_id = l.id and e.status in ('sent', 'sending'))`).count;
+    [{ n: leads_kept }] = await sql`select count(*)::int as n from leads where campaign_id = ${id}`;
+  }
   await sql`delete from campaigns where id = ${id}`;
+  await logEvent('campaign_deleted', { actor: opts.actor || 'dashboard', name: c.name, leads_deleted, leads_kept }, {});
+  return { deleted: true, leads_deleted, leads_kept };
 };
 
 // ---------- leads ----------
@@ -239,6 +251,18 @@ export const deleteLeads = async (ids: string[]) => {
   const sql = db();
   if (!ids.length) return 0;
   return (await sql`delete from leads where id in ${sql(ids)}`).count;
+};
+// Deletes leads (by id or email) that were never emailed; leads with a sent email are kept and listed.
+export const deleteUncontactedLeads = async (refs: string[], actor: Actor = 'dashboard') => {
+  const sql = db();
+  const ids = refs.filter((r) => !r.includes('@')), emails = refs.filter((r) => r.includes('@')).map((e) => e.trim().toLowerCase());
+  if (!refs.length) return { deleted: 0, kept_contacted: [] as string[], not_found: 0 };
+  const found = await sql`select l.id, l.email, exists (select 1 from emails e where e.lead_id = l.id and e.status in ('sent', 'sending')) as contacted
+    from leads l where ${ids.length ? sql`l.id in ${sql(ids)}` : sql`false`} or ${emails.length ? sql`lower(l.email) in ${sql(emails)}` : sql`false`}`;
+  const del = found.filter((l) => !l.contacted).map((l) => l.id as string);
+  const deleted = del.length ? (await sql`delete from leads where id in ${sql(del)}`).count : 0;
+  if (deleted) await logEvent('leads_deleted', { actor, count: deleted }, {});
+  return { deleted, kept_contacted: found.filter((l) => l.contacted).map((l) => l.email as string), not_found: refs.length - found.length };
 };
 
 // ---------- lists ----------

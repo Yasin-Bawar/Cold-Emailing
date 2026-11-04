@@ -128,7 +128,7 @@ api.patch('/campaigns/:id', async (req, res) => {
   const b = z.object({ name: z.string().trim().min(1).max(120).optional(), notes: z.string().max(5000).nullish(), status: z.enum(['draft', 'active', 'paused', 'done']).optional() }).parse(req.body);
   res.json(await repo.updateCampaign(uuid.parse(req.params.id), b));
 });
-api.delete('/campaigns/:id', async (req, res) => { await repo.deleteCampaign(uuid.parse(req.params.id)); res.json({ ok: true }); });
+api.delete('/campaigns/:id', async (req, res) => res.json({ ok: true, ...(await repo.deleteCampaign(uuid.parse(req.params.id), { withLeads: req.query.leads === '1' })) }));
 api.post('/campaigns/:id/approve', async (req, res) => res.json(await repo.approveEmails({ campaign_id: uuid.parse(req.params.id) })));
 
 // ---------- emails ----------
