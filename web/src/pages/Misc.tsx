@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router';
 import { ListChecks, Plus, Trash2, Inbox, MessageSquareReply, Activity as ActivityIcon, Ban, Search, Send, AlertTriangle, MailX, UserX, Pencil, CheckCircle2 } from 'lucide-react';
 import { api, fmtDate, qs, timeAgo } from '../api.ts';
-import { Avatar, Button, Card, Empty, Input, Modal, PageHeader, Pagination, Spinner, StatusChip, Textarea, cx, useLoad, useToast } from '../ui.tsx';
+import { Avatar, Button, Card, Empty, Input, Modal, PageHeader, Pagination, Spinner, STATUS, StatusChip, TONE, Textarea, cx, useLoad, useToast } from '../ui.tsx';
 import { LeadDrawer } from './LeadDrawer.tsx';
 
 // ---------- Lists ----------
@@ -51,10 +51,17 @@ export const Replies = () => {
   return (
     <div>
       <PageHeader icon={<Inbox className="size-5" />} tint="bg-emerald-100 text-emerald-700" title="Replies" sub="Every lead who wrote back. Their follow-ups were cancelled automatically." />
-      <div className="mb-4 flex flex-wrap gap-1.5">
-        {['', 'replied', 'interested', 'won', 'lost', 'unsubscribed'].map((s) => (
-          <button key={s} onClick={() => setFilter(s)} className={cx('rounded-full border px-3 py-1 text-[13px] font-medium capitalize', filter === s ? 'border-brand-500 bg-brand-50 text-brand-700' : 'border-line bg-white text-gray-600 hover:bg-gray-50')}>{s || 'All'}</button>
-        ))}
+      <div className="mb-4 flex flex-wrap gap-2">
+        {['', 'replied', 'interested', 'won', 'lost', 'unsubscribed'].map((s) => {
+          const st = STATUS[s];
+          const n = s ? (replies.data || []).filter((r) => r.status === s).length : (replies.data || []).length;
+          const on = filter === s;
+          return (
+            <button key={s} onClick={() => setFilter(s)} className={cx('inline-flex items-center gap-2 rounded-xl px-3.5 py-2 text-sm font-semibold ring-1 ring-inset transition', on ? (s ? TONE[st.tone] : 'bg-ink text-white ring-ink') : 'bg-white text-gray-700 ring-line hover:ring-gray-300')}>
+              {st && <st.Icon className="size-4" />}{s === 'replied' ? 'To answer' : st?.label || 'All replies'}<span className={cx('rounded-md px-1.5 text-xs tabular-nums', on ? 'bg-white/30' : 'bg-gray-100 text-gray-600')}>{n}</span>
+            </button>
+          );
+        })}
       </div>
       <Card>
         {!replies.data ? <div className="grid h-40 place-items-center"><Spinner /></div> : rows.length === 0 ? (
@@ -62,12 +69,13 @@ export const Replies = () => {
         ) : (
           <div className="divide-y divide-line">
             {rows.map((r) => (
-              <button key={r.id} onClick={() => setOpen(r.id)} className="flex w-full items-start gap-3 px-5 py-4 text-left hover:bg-gray-50/70">
+              <button key={r.id} onClick={() => setOpen(r.id)} className={cx('relative flex w-full items-start gap-3.5 px-5 py-4 text-left transition hover:bg-soft', r.status === 'replied' && 'bg-emerald-50/40')}>
+                {r.status === 'replied' && <span className="absolute inset-y-3 left-0 w-1 rounded-r bg-emerald-500" title="Not answered yet" />}
                 <Avatar name={r.business_name || r.email} />
                 <div className="min-w-0 flex-1">
-                  <div className="flex flex-wrap items-center gap-2"><span className="font-medium">{r.business_name || r.email}</span><StatusChip status={r.status} /><span className="ml-auto text-xs text-muted">{timeAgo(r.last_reply_at)}</span></div>
+                  <div className="flex flex-wrap items-center gap-2"><span className="font-bold">{r.business_name || r.email}</span><StatusChip status={r.status} /><span className="ml-auto text-xs text-muted">{timeAgo(r.last_reply_at)}</span></div>
                   <p className="text-xs text-muted">{r.email}{r.city ? ` · ${r.city}, ${r.state}` : ''}{r.campaign_name ? ` · ${r.campaign_name}` : ''}</p>
-                  <p className="mt-1.5 line-clamp-2 text-sm text-gray-700"><MessageSquareReply className="mr-1 inline size-3.5 text-emerald-600" />{r.last_reply}</p>
+                  <p className="mt-2 line-clamp-2 rounded-xl bg-white px-3 py-2 text-sm leading-relaxed text-gray-700 ring-1 ring-line"><MessageSquareReply className="mr-1.5 inline size-3.5 text-emerald-600" />{r.last_reply}</p>
                 </div>
               </button>
             ))}

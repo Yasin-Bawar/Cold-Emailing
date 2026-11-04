@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { X, Mail, Phone, Globe, MapPin, ExternalLink, MessageSquareReply, Clock } from 'lucide-react';
 import { api, fmtDate, timeAgo } from '../api.ts';
-import { Avatar, Button, Drawer, Select, Spinner, StatusChip, Textarea, useLoad, useToast } from '../ui.tsx';
+import { Avatar, Button, Drawer, Spinner, STATUS, StatusChip, TONE, Textarea, cx, useLoad, useToast } from '../ui.tsx';
 
 const STATUSES = ['new', 'queued', 'sent', 'replied', 'interested', 'won', 'lost', 'unsubscribed', 'bounced'];
 const EVENT_LABEL: Record<string, string> = {
@@ -35,22 +35,31 @@ export const LeadDrawer = ({ id, onClose, onChanged }: { id: string | null; onCl
           <div className="sticky top-0 z-10 flex items-start gap-3 border-b border-line bg-white px-6 py-5">
             <Avatar name={l.business_name || l.email} className="size-11 text-sm" />
             <div className="min-w-0 flex-1">
-              <h2 className="truncate text-lg font-semibold">{l.business_name || l.email}</h2>
+              <h2 className="truncate text-lg font-extrabold">{l.business_name || l.email}</h2>
               <p className="truncate text-sm text-muted">{[l.category, l.campaign_name].filter(Boolean).join(' · ') || 'Lead'}</p>
             </div>
             <button onClick={onClose} className="rounded-lg p-1.5 text-muted hover:bg-gray-100" aria-label="Close"><X className="size-5" /></button>
           </div>
 
           <div className="space-y-6 px-6 py-5">
-            <div className="flex flex-wrap items-center gap-2">
-              <StatusChip status={l.status} />
-              <Select value={l.status} disabled={saving} onChange={(e) => patch({ status: e.target.value }, `Status set to ${e.target.value}.`)} className="h-8 text-[13px]" aria-label="Status">
-                {STATUSES.map((s) => <option key={s} value={s}>{s}</option>)}
-              </Select>
-              {l.lists?.map((x: any) => <span key={x.id} className="rounded-md bg-gray-100 px-2 py-1 text-xs text-gray-600">{x.name}</span>)}
+            <div>
+              <p className="mb-2 text-sm font-bold">Status</p>
+              <div className="grid grid-cols-3 gap-1.5">
+                {STATUSES.map((st) => {
+                  const m = STATUS[st];
+                  const on = l.status === st;
+                  return (
+                    <button key={st} disabled={saving || on} onClick={() => patch({ status: st }, `Status set to ${m.label}.`)}
+                      className={cx('inline-flex items-center justify-center gap-1.5 rounded-xl px-2 py-2 text-[13px] font-semibold ring-1 ring-inset transition', on ? cx(TONE[m.tone], 'ring-2') : 'bg-white text-gray-500 ring-line hover:text-ink hover:ring-gray-300')}>
+                      <m.Icon className="size-3.5" />{m.label}
+                    </button>
+                  );
+                })}
+              </div>
+              {l.lists?.length > 0 && <div className="mt-2 flex flex-wrap gap-1.5">{l.lists.map((x: any) => <span key={x.id} className="rounded-lg bg-violet-50 px-2 py-1 text-xs font-semibold text-violet-700">{x.name}</span>)}</div>}
             </div>
 
-            <div className="grid gap-2.5 text-sm">
+            <div className="grid gap-2.5 rounded-2xl bg-soft p-4 text-sm">
               <a href={`mailto:${l.email}`} className="flex items-center gap-2.5 text-gray-700 hover:text-brand-600"><Mail className="size-4 text-muted" />{l.email}</a>
               {l.phone && <a href={`tel:${l.phone}`} className="flex items-center gap-2.5 text-gray-700"><Phone className="size-4 text-muted" />{l.phone}</a>}
               {(l.city || l.state) && <span className="flex items-center gap-2.5 text-gray-700"><MapPin className="size-4 text-muted" />{[l.address, l.city, l.state].filter(Boolean).join(', ')} <span className="text-xs text-muted">({l.timezone})</span></span>}
@@ -72,7 +81,7 @@ export const LeadDrawer = ({ id, onClose, onChanged }: { id: string | null; onCl
             )}
 
             <div>
-              <p className="mb-2 text-sm font-semibold">Emails</p>
+              <p className="mb-2 text-sm font-bold">Emails</p>
               {l.emails?.length ? (
                 <div className="divide-y divide-line rounded-xl border border-line">
                   {l.emails.map((e: any) => (
@@ -91,13 +100,13 @@ export const LeadDrawer = ({ id, onClose, onChanged }: { id: string | null; onCl
             </div>
 
             <div>
-              <p className="mb-2 text-sm font-semibold">Notes</p>
+              <p className="mb-2 text-sm font-bold">Notes</p>
               <Textarea rows={4} value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Call notes, what they want, next step…" />
               <div className="mt-2 flex justify-end"><Button size="sm" variant="primary" disabled={notes === (l.notes || '')} loading={saving} onClick={() => patch({ notes }, 'Notes saved.')}>Save notes</Button></div>
             </div>
 
             <div>
-              <p className="mb-3 text-sm font-semibold">Activity</p>
+              <p className="mb-3 text-sm font-bold">Activity</p>
               <ol className="relative space-y-4 border-l border-line pl-5">
                 {l.events?.map((ev: any) => (
                   <li key={ev.id} className="relative">

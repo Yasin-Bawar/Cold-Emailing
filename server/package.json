@@ -3,16 +3,16 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev:api": "tsx watch src/api/index.ts",
-    "dev:worker": "tsx watch src/worker/index.ts",
-    "start:api": "tsx src/api/index.ts",
-    "start:worker": "tsx src/worker/index.ts",
+    "dev:api": "node init && tsx watch src/api/index.ts",
+    "dev:worker": "node init && tsx watch src/worker/index.ts",
+    "start:api": "node init && tsx src/api/index.ts",
+    "start:worker": "node init && tsx src/worker/index.ts",
     "migrate": "tsx src/scripts/migrate.ts",
     "import:outreach": "tsx src/scripts/import-outreach.ts",
     "token:create": "tsx src/scripts/create-token.ts",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
-    "start": "tsx src/start.ts"
+    "start": "node init && tsx src/start.ts"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.32.2",
