@@ -57,6 +57,7 @@ One repo, **two services**:
    - Build command `pnpm build`, start command `pnpm start` (both are defaults Railway picks up from package.json).
 2. **+ New → GitHub repo** → the same repo again. That's the **worker**.
    - Same variables, plus `ROLE=worker`. No domain needed.
+   - The API service also runs the sending loop (set `RUN_SENDER=false` to stop that), so emails still go out if the worker is down. A lease in the database makes sure only one of them sends at a time. **Home** and each campaign show "Sender is running · checked N min ago", or a red warning when nothing has checked in for 10 minutes.
 
 `ENCRYPTION_KEY` is any long random string (`openssl rand -base64 32`). It encrypts the stored App Passwords and API keys, so keep it the same on both services and don't lose it.
 

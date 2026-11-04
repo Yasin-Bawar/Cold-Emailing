@@ -552,9 +552,13 @@ export const queueStatus = async (now = new Date()) => {
       count(*) filter (where status = 'draft')::int as drafts,
       count(*) filter (where status = 'sending')::int as sending
     from emails`;
+  const [snd] = await sql`select sender_seen_at, sender_note from settings where id = 1`;
+  const seen = snd?.sender_seen_at ? new Date(snd.sender_seen_at) : null;
   return {
     paused: settings.paused,
     postal_address_set: !!settings.postal_address.trim(),
+    // The sending loop checks in every couple of minutes; if it hasn't for 10 minutes, nothing is being sent
+    sender: { running: !!seen && now.getTime() - seen.getTime() < 10 * 60_000, last_check_at: seen, note: snd?.sender_note ?? null },
     queue: q,
     accounts: accounts.map((a) => ({
       id: a.id, email: a.email, provider: a.provider, status: a.status, sent_today: a.sent_today, cap_today: a.cap_today,

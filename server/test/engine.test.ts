@@ -251,4 +251,18 @@ d3('Resend accounts: warmed up, 100 a day, limit errors', async () => {
     expect((await repo.listEmails({ status: ['approved'] })).total).toBe(2); // nothing lost
     expect((await repo.listEmails({ status: ['failed'] })).total).toBe(0);
   });
+
+  it('lets only one process hold the sender lease, and hands it over when it runs out', async () => {
+    const { holdLease, summarize } = await import('../src/worker/loops.ts');
+    const t0 = new Date('2026-11-04T16:00:00Z');
+    await db()`update settings set sender_holder = null, sender_lease_until = null where id = 1`;
+    expect(await holdLease('api-1', t0)).toBe(true);
+    expect(await holdLease('worker-1', t0)).toBe(false); // the API holds it
+    expect(await holdLease('api-1', new Date(t0.getTime() + 120_000))).toBe(true); // renewed each tick
+    expect(await holdLease('worker-1', new Date(t0.getTime() + 200_000))).toBe(false);
+    expect(await holdLease('worker-1', new Date(t0.getTime() + 120_000 + 301_000))).toBe(true); // API stopped: taken over
+    expect(summarize({ results: [{ account: 'a@x.com', ok: true }, { account: 'b@x.com', held: 'daily limit reached (100/100)' }] })).toBe('Sent 1 · b@x.com: daily limit reached (100/100)');
+    expect(summarize({ skipped: 'Sending is paused in Settings.', results: [] })).toBe('Sending is paused in Settings.');
+  });
 });
+

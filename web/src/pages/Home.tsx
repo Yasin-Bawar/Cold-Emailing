@@ -1,6 +1,7 @@
 import { Link, useNavigate } from 'react-router';
 import { Send, MessageSquareReply, Clock, MoreHorizontal, AlertTriangle, Mail, Eye } from 'lucide-react';
 import { api, fmtDate, type Campaign } from '../api.ts';
+import { SenderStatus } from './SenderStatus.tsx';
 import { Card, CardHeader, Delta, Empty, PageHeader, Spinner, StatusChip, useLoad, Button } from '../ui.tsx';
 
 type Stats = {
@@ -36,6 +37,7 @@ export const Home = () => {
   return (
     <div>
       <PageHeader title="Welcome back" sub="Here's how your outreach is doing over the last 14 days." />
+      <SenderStatus className="mb-5" />
 
       {(!q.postal_address_set || q.paused || !q.accounts.length) && (
         <div className="mb-5 flex flex-wrap items-center gap-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">

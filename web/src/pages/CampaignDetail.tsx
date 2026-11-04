@@ -4,6 +4,7 @@ import { ArrowLeft, Check, CheckCheck, Pause, Play, Pencil, SkipForward, Undo2, 
 import { api, fmtDate, qs, type Campaign, type EmailRow } from '../api.ts';
 import { Avatar, Button, Card, Empty, Input, Modal, Pagination, Spinner, StatusChip, Textarea, cx, useLoad, useToast } from '../ui.tsx';
 import { BulkModal } from './BulkModal.tsx';
+import { SenderStatus } from './SenderStatus.tsx';
 
 const TABS = [
   { id: '', label: 'All' },
@@ -115,6 +116,7 @@ export const CampaignDetail = () => {
             </div>
           ))}
         </div>
+        <div className="border-t border-line px-5 py-3"><SenderStatus /></div>
         {total > 0 && (
           <div className="border-t border-line px-5 py-3">
             <div className="flex h-2 overflow-hidden rounded-full bg-gray-100">
