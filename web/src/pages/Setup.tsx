@@ -245,6 +245,7 @@ export const McpPage = () => {
             {[
               ['create_campaign / list_campaigns', 'make and list campaigns'],
               ['add_leads', 'up to 1000 at a time, duplicates skipped'],
+              ['generate_emails', 'fill the 140 designs for a whole campaign'],
               ['add_email / add_followup', 'custom HTML + image, saved as drafts'],
               ['approve_emails', 'queue drafts (asks you above 100)'],
               ['list_leads / get_lead / update_lead', 'find and update leads'],

@@ -10,9 +10,10 @@ export const esc = (s: string) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&
 //   {{postal_address}}  the address from Settings (required by CAN-SPAM; sending stops if it is empty)
 //   {{unsubscribe_url}} the one-click unsubscribe link for this lead (added at the bottom if missing)
 //   {{image_url}}       the email's image (sent inline as cid:concept)
-export const TOKENS = ['{{postal_address}}', '{{unsubscribe_url}}', '{{image_url}}'] as const;
+//   {{asset_base}}      base URL of the template photos (<PUBLIC_URL>/photos)
+export const TOKENS = ['{{postal_address}}', '{{unsubscribe_url}}', '{{image_url}}', '{{asset_base}}'] as const;
 
-export type ComposeInput = { html: string | null; text: string | null; address: string; unsubscribeUrl: string; imageSrc?: string };
+export type ComposeInput = { html: string | null; text: string | null; address: string; unsubscribeUrl: string; imageSrc?: string; assetBase?: string };
 
 export const insertAddress = (html: string, text: string, address: string) => {
   const a = address.trim();
@@ -38,7 +39,7 @@ export const htmlToText = (html: string) =>
 export const hasAddressSlot = (html: string | null, text: string | null) =>
   [html || '', text || ''].some((s) => s.includes('{{postal_address}}') || s.includes(LEGACY_PLACEHOLDER) || s.includes(esc(LEGACY_PLACEHOLDER)));
 
-export const compose = ({ html, text, address, unsubscribeUrl, imageSrc }: ComposeInput) => {
+export const compose = ({ html, text, address, unsubscribeUrl, imageSrc, assetBase }: ComposeInput) => {
   if (!address.trim()) throw new Error('Postal address is empty. Add it in Settings before sending.');
   let h = html || '';
   let t = text || (h ? htmlToText(h) : '');
@@ -46,6 +47,7 @@ export const compose = ({ html, text, address, unsubscribeUrl, imageSrc }: Compo
   // Emails without an address slot still get the address in the footer.
   const needsAddress = !h.includes(esc(address.trim())) && !!h;
   if (imageSrc) h = h.split('{{image_url}}').join(imageSrc);
+  if (assetBase) h = h.split('{{asset_base}}').join(assetBase.replace(/\/+$/, ''));
   const unsubHtml = `<a href="${esc(unsubscribeUrl)}" style="color:#8f8b85;text-decoration:underline;">Unsubscribe</a>`;
   if (h.includes('{{unsubscribe_url}}')) h = h.split('{{unsubscribe_url}}').join(esc(unsubscribeUrl));
   else if (h) {

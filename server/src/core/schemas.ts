@@ -21,6 +21,8 @@ export const LeadInput = z.object({
   source_url: opt(1000),
   score: z.coerce.number().int().min(0).max(100).nullish(),
   notes: opt(5000),
+  // Extra details used by the email templates: hook (one personal line), specialty, rating, reviews, type (business type key).
+  custom: z.record(z.string(), z.union([z.string().max(1000), z.number(), z.boolean(), z.null()])).optional(),
 });
 export type LeadInput = z.infer<typeof LeadInput>;
 
@@ -37,6 +39,7 @@ export const LeadPatch = z.object({
   website: opt(400),
   score: z.coerce.number().int().min(0).max(100).nullish(),
   campaign_id: z.string().uuid().nullish(),
+  custom: z.record(z.string(), z.union([z.string().max(1000), z.number(), z.boolean(), z.null()])).optional(),
 });
 export type LeadPatch = z.infer<typeof LeadPatch>;
 
@@ -66,6 +69,7 @@ export const EmailInput = z.object({
   subject: str(300).min(1),
   html: z.string().max(2_000_000).nullish(),
   text: z.string().max(100_000).nullish(),
+  design: z.string().max(60).nullish(),
 });
 export type EmailInput = z.infer<typeof EmailInput>;
 

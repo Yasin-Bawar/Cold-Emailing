@@ -97,7 +97,7 @@ export const deleteCampaign = async (id: string) => {
 };
 
 // ---------- leads ----------
-const LEAD_COLS = ['email', 'business_name', 'contact_name', 'category', 'city', 'state', 'timezone', 'phone', 'address', 'website', 'source_url', 'score', 'notes', 'campaign_id'] as const;
+const LEAD_COLS = ['email', 'business_name', 'contact_name', 'category', 'city', 'state', 'timezone', 'phone', 'address', 'website', 'source_url', 'score', 'notes', 'campaign_id', 'custom'] as const;
 
 export type UpsertResult = {
   created: { id: string; email: string }[];
@@ -140,12 +140,18 @@ export const upsertLeads = async (rows: LeadInput[], opts: { campaign_id?: strin
       score: r.score ?? null,
       notes: r.notes ?? null,
       campaign_id: opts.campaign_id ?? null,
+      custom: sql.json((r.custom ?? {}) as any),
     });
   }
   for (let i = 0; i < fresh.length; i += 500) {
     const chunk = fresh.slice(i, i + 500);
     const ins = await sql`insert into leads ${sql(chunk as any, LEAD_COLS as any)} on conflict do nothing returning id, email`;
     out.created.push(...ins.map((r) => ({ id: r.id as string, email: String(r.email).toLowerCase() })));
+  }
+  // Leads that already exist: merge any new template details (hook, rating, ...) into them.
+  for (const r of unique) {
+    const id = existing.get(r.email);
+    if (id && r.custom && Object.keys(r.custom).length) await sql`update leads set custom = custom || ${sql.json(r.custom as any)}, updated_at = now() where id = ${id}`;
   }
   if (opts.campaign_id && out.existing.length) {
     await sql`update leads set campaign_id = ${opts.campaign_id}, updated_at = now() where id in ${sql(out.existing.map((r) => r.id))} and campaign_id is null`;
@@ -218,6 +224,7 @@ export const updateLeads = async (ids: string[], patch: LeadPatch, actor: Actor 
   const sql = db();
   const clean: Record<string, unknown> = Object.fromEntries(Object.entries(patch).filter(([, v]) => v !== undefined));
   if (clean.timezone !== undefined) clean.timezone = validZone(clean.timezone as string) ?? null;
+  if (clean.custom !== undefined) clean.custom = sql.json((clean.custom ?? {}) as any);
   if (!ids.length || !Object.keys(clean).length) return 0;
   const res = await sql`update leads set ${sql(clean as any, Object.keys(clean) as any)}, updated_at = now() where id in ${sql(ids)}`;
   if (clean.status && STOP_STATUSES.includes(clean.status as string)) {
@@ -279,11 +286,11 @@ export const addEmail = async (input: EmailInput, image?: ImageInput | null, act
   }
   const row = {
     lead_id: lead.id, campaign_id: campaignId, step: input.step, delay_days: input.step === 0 ? 0 : input.delay_days || 3,
-    subject: input.subject, html: input.html ?? null, text: input.text ?? null, image_path: imagePath,
+    subject: input.subject, html: input.html ?? null, text: input.text ?? null, image_path: imagePath, design: input.design ?? null,
   };
   let email;
   if (old) {
-    [email] = await sql`update emails set subject = ${row.subject}, html = ${row.html}, text = ${row.text}, image_path = ${row.image_path},
+    [email] = await sql`update emails set subject = ${row.subject}, html = ${row.html}, text = ${row.text}, image_path = ${row.image_path}, design = ${row.design},
       delay_days = ${row.delay_days}, status = 'draft', error = null, send_after = null where id = ${old.id} returning id, lead_id, campaign_id, step, status`;
   } else {
     [email] = await sql`insert into emails ${sql(row as any, Object.keys(row) as any)} returning id, lead_id, campaign_id, step, status`;

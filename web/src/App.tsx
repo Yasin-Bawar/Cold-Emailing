@@ -10,6 +10,7 @@ import { Campaigns } from './pages/Campaigns.tsx';
 import { CampaignDetail } from './pages/CampaignDetail.tsx';
 import { Lists, Replies, Activity, Suppression } from './pages/Misc.tsx';
 import { Accounts, SettingsPage, McpPage } from './pages/Setup.tsx';
+import { Designs } from './pages/Designs.tsx';
 
 export const App = () => {
   const [authed, setAuthed] = useState<boolean | null>(null);
@@ -30,6 +31,7 @@ export const App = () => {
               <Route path="replies" element={<Replies />} />
               <Route path="campaigns" element={<Campaigns />} />
               <Route path="campaigns/:id" element={<CampaignDetail />} />
+              <Route path="designs" element={<Designs />} />
               <Route path="activity" element={<Activity />} />
               <Route path="accounts" element={<Accounts />} />
               <Route path="suppression" element={<Suppression />} />

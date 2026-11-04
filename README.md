@@ -105,6 +105,25 @@ OUTREACH_URL=https://YOUR-APP.up.railway.app OUTREACH_TOKEN=YOUR_TOKEN pnpm impo
 
 On Windows PowerShell, set the two variables first: `$env:OUTREACH_URL="https://..."; $env:OUTREACH_TOKEN="..."`, then run `pnpm import:outreach C:\Users\you\Downloads\texas-send ...`.
 
+## Email designs (templates)
+
+140 ready-made designs: **14 business types × 10 layouts** (Classic, Split, Night, Magazine, Phone, Cards, Minimal, Bold, Gallery, Steps). Each design is the email itself, with a preview of the business's future website built in. When emails are generated, only the words change:
+
+| Lead field | Used for |
+|---|---|
+| `business_name`, `city`, `state` | everywhere (name, domain idea like `freshfadez.com`, location) |
+| `category` (or `custom.type`) | picks the business type, e.g. "Barbershop", "Food truck", "Auto repair" |
+| `contact_name` or `custom.first_name` | greeting ("Hi Maria,") |
+| `custom.hook` | the one personal line about the business (the most important field) |
+| `custom.specialty` | the mock website's tagline (e.g. "Birria tacos") |
+| `custom.rating`, `custom.reviews` | star rating on the mock site (only if real) |
+
+Business types: barbershop, hair salon, nail salon, beauty & spa, tattoo, restaurant, food truck, bakery & café, cleaning, lawn & landscaping, home trades (plumbing, electrical, HVAC), auto repair, fitness, pet grooming.
+
+- **Dashboard:** **Designs** shows all 140. On a campaign, **Generate emails** drafts one for every lead without an email (plus an optional follow-up 4 days later). No two leads in the same city get the same design until all ten are used there.
+- **MCP:** `add_leads` (with `custom`), then `generate_emails`, then `approve_emails`.
+- Photos live in `server/assets/photos/` (Unsplash License, see its `CREDITS.md`) and are served at `<PUBLIC_URL>/photos/...`.
+
 ## How sending works
 
 Every 2 minutes, for each active inbox that is under today's limit and past its 1–4 minute gap, the worker picks one approved email:

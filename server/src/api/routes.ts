@@ -13,6 +13,8 @@ import { verifyImap } from '../core/inbox.ts';
 import { unsubscribeUrl } from '../core/engine.ts';
 import { gmailApiSender, googleConfigured, redirectUri } from '../core/google.ts';
 import { createToken, listTokens, revokeToken } from './auth.ts';
+import { listDesigns, renderDesign, SAMPLE, TYPES, parseDesignKey } from '../templates/index.ts';
+import { generateEmails } from '../core/generate.ts';
 
 export const api = Router();
 
@@ -165,9 +167,9 @@ api.get('/emails/:id/preview', async (req, res) => {
   const img = e.image_path ? signedFileUrl(e.image_path) : '';
   let html: string;
   if (s.postal_address.trim()) {
-    html = compose({ html: e.html || `<pre style="font:14px/1.6 Arial;white-space:pre-wrap;padding:24px">${esc(e.text || '')}</pre>`, text: e.text, address: s.postal_address, unsubscribeUrl: unsubscribeUrl(e.lead_id), imageSrc: img }).html!;
+    html = compose({ html: e.html || `<pre style="font:14px/1.6 Arial;white-space:pre-wrap;padding:24px">${esc(e.text || '')}</pre>`, text: e.text, address: s.postal_address, unsubscribeUrl: unsubscribeUrl(e.lead_id), imageSrc: img, assetBase: '/photos' }).html!;
   } else {
-    html = (e.html || `<pre style="font:14px/1.6 Arial;white-space:pre-wrap;padding:24px">${esc(e.text || '')}</pre>`).split('{{image_url}}').join(img);
+    html = (e.html || `<pre style="font:14px/1.6 Arial;white-space:pre-wrap;padding:24px">${esc(e.text || '')}</pre>`).split('{{image_url}}').join(img).split('{{asset_base}}').join('/photos');
     html = insertAddress(html, '', '⚠ Postal address not set (Settings)').html;
   }
   res.setHeader('Content-Security-Policy', "sandbox allow-popups allow-popups-to-escape-sandbox; default-src 'none'; img-src 'self' data: https:; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com");
@@ -236,3 +238,20 @@ api.patch('/settings', async (req, res) => res.json(await repo.updateSettings(Se
 api.get('/tokens', async (_req, res) => res.json(await listTokens()));
 api.post('/tokens', async (req, res) => res.json(await createToken(z.object({ name: z.string().trim().min(1).max(80) }).parse(req.body).name)));
 api.delete('/tokens/:id', async (req, res) => { await revokeToken(uuid.parse(req.params.id)); res.json({ ok: true }); });
+
+// ---------- templates ----------
+api.get('/business-types', (_req, res) => res.json(TYPES.map((t) => ({ key: t.key, label: t.label, plural: t.plural, keywords: t.keywords, photos: t.photos.length }))));
+api.get('/designs', (req, res) => res.json(listDesigns((req.query.type as string) || undefined)));
+api.get('/designs/:key/preview', (req, res) => {
+  const d = parseDesignKey(req.params.key);
+  if (!d) return res.status(404).send('Unknown design');
+  const r = renderDesign(req.params.key, SAMPLE[d.t.key]);
+  const html = compose({ html: r.html, text: r.text, address: 'Your postal address', unsubscribeUrl: '#unsubscribe', assetBase: '/photos' }).html!;
+  res.setHeader('Content-Security-Policy', "sandbox allow-popups allow-popups-to-escape-sandbox; default-src 'none'; img-src 'self' data: https:; style-src 'unsafe-inline'");
+  res.setHeader('Content-Type', 'text/html; charset=utf-8');
+  res.send(html);
+});
+api.post('/campaigns/:id/generate', async (req, res) => {
+  const b = z.object({ followup: z.boolean().optional(), followup_days: z.number().int().min(1).max(30).optional(), overwrite: z.boolean().optional(), type: z.string().optional(), lead_ids: z.array(uuid).max(5000).optional() }).parse(req.body || {});
+  res.json(await generateEmails({ campaign_id: uuid.parse(req.params.id), ...b }));
+});

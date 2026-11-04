@@ -162,3 +162,51 @@ d('send and inbox engine', async () => {
     expect(found.total).toBe(1);
   });
 });
+
+const d2 = process.env.TEST_DATABASE_URL ? describe : describe.skip;
+d2('template generation', async () => {
+  process.env.DATABASE_URL = process.env.TEST_DATABASE_URL;
+  const { db, closeDb } = await import('../src/core/db.ts');
+  const { migrate } = await import('../src/scripts/migrate.ts');
+  const repo = await import('../src/core/repo.ts');
+  const { generateEmails } = await import('../src/core/generate.ts');
+  afterAll(async () => { await closeDb(); });
+
+  it('drafts one email per lead, never repeats a design in a city, and skips unknown types', async () => {
+    const sql = db();
+    await sql`drop schema public cascade`;
+    await sql`create schema public`;
+    await migrate(() => {});
+    const c = await repo.createCampaign('Templates');
+    const leads = [
+      ...Array.from({ length: 12 }, (_, i) => ({ email: `b${i}@x.com`, business_name: `Barber ${i}`, category: 'Barbershop', city: 'Tulsa', state: 'OK' })),
+      { email: 'truck@x.com', business_name: 'Taco Loco', category: 'Food truck', city: 'Tulsa', state: 'OK', custom: { hook: 'Your birria quesatacos sell out by noon.', rating: 4.9, reviews: 210 } },
+      { email: 'acct@x.com', business_name: 'Numbers LLC', category: 'Accounting', city: 'Tulsa', state: 'OK' },
+      { email: 'forced@x.com', business_name: 'Mystery Spot', category: 'Shop', city: 'Tulsa', state: 'OK', custom: { type: 'tattoo' } },
+    ];
+    await repo.upsertLeads(leads as any, { campaign_id: c.id });
+    const r = await generateEmails({ campaign_id: c.id, followup: true });
+    expect(r.created).toBe(14);
+    expect(r.followups).toBe(14);
+    expect(r.skipped).toEqual([{ email: 'acct@x.com', reason: expect.stringMatching(/unknown business type/) }]);
+    expect(r.by_type).toEqual({ barbershop: 12, 'food-truck': 1, tattoo: 1 });
+    const designs = (await sql`select e.design from emails e join leads l on l.id = e.lead_id where l.category = 'Barbershop' and e.step = 0`).map((x) => x.design);
+    expect(new Set(designs.slice(0, 10)).size).toBe(10); // first ten barbers in Tulsa all different
+    expect(new Set(designs).size).toBe(10); // 11th and 12th reuse only after all ten are used
+    const [truck] = await sql`select e.html, e.subject from emails e join leads l on l.id = e.lead_id where l.email = 'truck@x.com' and e.step = 0`;
+    expect(truck.html).toContain('Your birria quesatacos sell out by noon.');
+    expect(truck.subject).toContain('Taco Loco');
+    const [fu] = await sql`select e.subject, e.delay_days from emails e join leads l on l.id = e.lead_id where l.email = 'truck@x.com' and e.step = 1`;
+    expect(fu.subject).toBe(`Re: ${truck.subject}`);
+    expect(fu.delay_days).toBe(4);
+    // Running again creates nothing new.
+    const again = await generateEmails({ campaign_id: c.id });
+    expect(again.created).toBe(0);
+    // Overwrite re-renders template drafts with new details.
+    await repo.upsertLeads([{ email: 'truck@x.com', custom: { hook: 'New hook line.' } }] as any);
+    const re = await generateEmails({ campaign_id: c.id, overwrite: true, lead_ids: [(await repo.findLeadByEmail('truck@x.com')).id] });
+    expect(re.created).toBe(1);
+    const [truck2] = await sql`select e.html from emails e join leads l on l.id = e.lead_id where l.email = 'truck@x.com' and e.step = 0`;
+    expect(truck2.html).toContain('New hook line.');
+  });
+});

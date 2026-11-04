@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router';
-import { ArrowLeft, Check, CheckCheck, Pause, Play, Pencil, SkipForward, Undo2, Upload, Trash2, Search, Monitor, Smartphone, Users, Mail, ExternalLink } from 'lucide-react';
+import { ArrowLeft, Check, CheckCheck, Pause, Play, Pencil, SkipForward, Undo2, Upload, Trash2, Search, Monitor, Smartphone, Users, Mail, ExternalLink, Wand2 } from 'lucide-react';
 import { api, fmtDate, qs, type Campaign, type EmailRow } from '../api.ts';
 import { Button, Card, Empty, Input, Modal, Pagination, Spinner, StatusChip, Textarea, cx, useLoad, useToast } from '../ui.tsx';
 import { BulkModal } from './BulkModal.tsx';
@@ -28,6 +28,7 @@ export const CampaignDetail = () => {
   const [edit, setEdit] = useState<any>(null);
   const [bulk, setBulk] = useState(false);
   const [confirmAll, setConfirmAll] = useState(false);
+  const [gen, setGen] = useState<{ open: boolean; followup: boolean; result?: any }>({ open: false, followup: true });
   const [busy, setBusy] = useState('');
   const [frameKey, setFrameKey] = useState(0);
   const rows = emails.data?.rows || [];
@@ -85,6 +86,7 @@ export const CampaignDetail = () => {
         <div className="flex flex-wrap gap-2">
           <Button icon={<Upload className="size-4" />} onClick={() => setBulk(true)}>Add leads</Button>
           <Button icon={<Users className="size-4" />} onClick={() => nav(`/leads?campaign_id=${c.id}`)}>View leads</Button>
+          <Button icon={<Wand2 className="size-4" />} onClick={() => setGen({ open: true, followup: true })}>Generate emails</Button>
           {c.status === 'paused'
             ? <Button icon={<Play className="size-4" />} loading={busy === 'resume'} onClick={() => api(`/campaigns/${c.id}`, { method: 'PATCH', body: { status: 'active' } }).then(() => { toast('Campaign resumed.'); campaign.reload(); })}>Resume</Button>
             : <Button icon={<Pause className="size-4" />} onClick={() => api(`/campaigns/${c.id}`, { method: 'PATCH', body: { status: 'paused' } }).then(() => { toast('Campaign paused. Nothing in it will be sent.'); campaign.reload(); })}>Pause</Button>}
@@ -177,6 +179,32 @@ export const CampaignDetail = () => {
         )}
       </Modal>
       <BulkModal open={bulk} onClose={() => setBulk(false)} onDone={refresh} defaultCampaign={c.id} />
+      <Modal open={gen.open} onClose={() => setGen({ open: false, followup: true })} title="Generate emails from designs"
+        sub="Every lead in this campaign without an email gets one of the 10 designs for its business type, filled with its own name, city and details."
+        footer={gen.result ? <Button variant="primary" onClick={() => setGen({ open: false, followup: true })}>Done</Button> : <><Button onClick={() => setGen({ open: false, followup: true })}>Cancel</Button>
+          <Button variant="primary" icon={<Wand2 className="size-4" />} loading={busy === 'gen'} onClick={async () => {
+            setBusy('gen');
+            try { const r = await api<any>(`/campaigns/${c.id}/generate`, { body: { followup: gen.followup } }); setGen({ ...gen, result: r }); refresh(); }
+            catch (e) { toast((e as Error).message, 'error'); } finally { setBusy(''); }
+          }}>Generate drafts</Button></>}>
+        {gen.result ? (
+          <div className="space-y-2 text-sm">
+            <p><b>{gen.result.created}</b> emails drafted{gen.result.followups ? <>, plus <b>{gen.result.followups}</b> follow-ups</> : null}. Review them, then approve.</p>
+            {Object.keys(gen.result.by_type || {}).length > 0 && <p className="text-muted">{Object.entries(gen.result.by_type).map(([k, v]) => `${k}: ${v}`).join(' · ')}</p>}
+            {gen.result.skipped?.length > 0 && (
+              <div className="rounded-lg bg-amber-50 p-3 text-amber-900">
+                <p className="mb-1 font-medium">{gen.result.skipped.length} skipped</p>
+                <ul className="max-h-40 list-disc overflow-y-auto pl-5 text-xs">{gen.result.skipped.slice(0, 50).map((s: any) => <li key={s.email}>{s.email}: {s.reason}</li>)}</ul>
+              </div>
+            )}
+          </div>
+        ) : (
+          <label className="flex items-start gap-2 text-sm">
+            <input type="checkbox" className="mt-1 accent-brand-600" checked={gen.followup} onChange={(e) => setGen({ ...gen, followup: e.target.checked })} />
+            <span>Also draft a short follow-up, sent 4 days later in the same thread (cancelled automatically if they reply).</span>
+          </label>
+        )}
+      </Modal>
     </div>
   );
 };

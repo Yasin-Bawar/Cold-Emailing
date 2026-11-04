@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { NavLink, Outlet, useNavigate, Link } from 'react-router';
-import { Home, Users, Building2, ListChecks, Mail, Inbox, Activity, Ban, Settings, KeyRound, Search, Plus, Menu, X, Sparkles, LogOut, Upload } from 'lucide-react';
+import { Home, Users, Building2, ListChecks, Mail, Inbox, Activity, Ban, Settings, KeyRound, Search, Plus, Menu, X, Sparkles, LogOut, Upload, LayoutTemplate } from 'lucide-react';
 import { api } from './api.ts';
 import { cx, Button } from './ui.tsx';
 import { BulkModal } from './pages/BulkModal.tsx';
@@ -14,6 +14,7 @@ const NAV: { section?: string; items: { to: string; label: string; icon: ReactNo
   ] },
   { section: 'Outreach', items: [
     { to: '/campaigns', label: 'Campaigns', icon: <Building2 className="size-[18px]" /> },
+    { to: '/designs', label: 'Designs', icon: <LayoutTemplate className="size-[18px]" /> },
     { to: '/activity', label: 'Activity', icon: <Activity className="size-[18px]" /> },
   ] },
   { section: 'Setup', items: [

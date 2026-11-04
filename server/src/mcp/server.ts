@@ -6,8 +6,21 @@ import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/
 import { z } from 'zod';
 import * as repo from '../core/repo.ts';
 import { LeadInput, LEAD_STATUSES, EMAIL_STATUSES } from '../core/schemas.ts';
+import { TYPES, listDesigns } from '../templates/index.ts';
+import { generateEmails } from '../core/generate.ts';
 
-const INSTRUCTIONS = `Mavan Outreach: a cold-email platform. Typical flow:
+const INSTRUCTIONS = `Mavan Outreach: a cold-email platform.
+
+FAST FLOW (templates, best for volume): 140 ready designs = 14 business types x 10 layouts. Only the words change per business.
+1. create_campaign.
+2. add_leads with category (e.g. "Barbershop", "Food truck", "Auto repair"; see list_business_types) and, per lead, custom details:
+   custom.hook = one true, specific line about this business (from its Facebook page, reviews or news) - the most important field;
+   custom.specialty (e.g. "Birria tacos"), custom.rating and custom.reviews (only if real), custom.first_name (owner's first name if known),
+   custom.type (a business type key, if the category is unusual).
+3. generate_emails for the campaign (optionally followup: true). Each lead gets a design for its type; no two leads in one city share a design.
+4. approve_emails when the user says to.
+
+CUSTOM FLOW (one-off designs):
 1. create_campaign (or list_campaigns to reuse one).
 2. add_leads with each business's public email, name, city, state and source_url (where the email was found).
 3. add_email for each lead (step 0): a unique subject, a full HTML email (inline CSS, table layout, max ~600px wide, under ~100 KB) and a plain-text version.
@@ -154,11 +167,12 @@ export const buildMcpServer = () => {
       notes: z.string().max(5000).optional(),
       contact_name: z.string().max(200).optional(),
       phone: z.string().max(60).optional(),
+      custom: z.record(z.string(), z.union([z.string(), z.number(), z.null()])).optional().describe('Template details to merge in: hook, specialty, rating, reviews, first_name, type'),
     },
   }, wrap(async (a: any) => {
     const l = a.lead.includes('@') ? await repo.findLeadByEmail(a.lead) : await repo.getLead(a.lead);
     if (!l) throw new Error('Lead not found');
-    await repo.updateLeads([l.id], { status: a.status, notes: a.notes, contact_name: a.contact_name, phone: a.phone }, 'mcp');
+    await repo.updateLeads([l.id], { status: a.status, notes: a.notes, contact_name: a.contact_name, phone: a.phone, custom: a.custom ? { ...(l.custom || {}), ...a.custom } : undefined }, 'mcp');
     const full = await repo.getLead(l.id);
     return { id: full!.id, email: full!.email, status: full!.status, notes: full!.notes };
   }));
@@ -211,6 +225,28 @@ export const buildMcpServer = () => {
     description: 'Mark draft or approved emails as skipped so they are never sent.',
     inputSchema: { ids: z.array(z.string().uuid()).min(1).max(5000) },
   }, wrap(async (a: { ids: string[] }) => ({ skipped: await repo.setEmailStatus(a.ids, 'skipped', 'mcp') })));
+
+  s.registerTool('list_business_types', {
+    title: 'List business types',
+    description: 'The 14 business types the templates cover, with the keywords matched against a lead\'s category.',
+    inputSchema: {},
+    annotations: { readOnlyHint: true },
+  }, wrap(async () => TYPES.map((t) => ({ key: t.key, label: t.label, keywords: t.keywords, designs: listDesigns(t.key).map((d) => `${d.key} (${d.layout})`) }))));
+
+  s.registerTool('generate_emails', {
+    title: 'Generate template emails',
+    description: 'Draft an email for every lead in a campaign that has none yet, using the template designs for its business type (from category or custom.type), filled with its name, city, custom.hook, custom.specialty, custom.rating/reviews. Optionally also drafts a short follow-up. Drafts only; nothing is sent before approve_emails.',
+    inputSchema: {
+      campaign: campaignRef,
+      followup: z.boolean().optional().describe('Also draft a short follow-up (step 1)'),
+      followup_days: z.number().int().min(1).max(30).optional().describe('Days after the first email, default 4'),
+      overwrite: z.boolean().optional().describe('Re-generate existing unsent template drafts'),
+      type: z.string().optional().describe('Force one business type key for all leads'),
+    },
+  }, wrap(async (a: { campaign: string; followup?: boolean; followup_days?: number; overwrite?: boolean; type?: string }) => {
+    const c = await resolveCampaign(a.campaign);
+    return generateEmails({ campaign_id: c!.id, followup: a.followup, followup_days: a.followup_days, overwrite: a.overwrite, type: a.type }, 'mcp');
+  }));
 
   s.registerTool('pause_sending', {
     title: 'Pause all sending',

@@ -29,6 +29,9 @@ export const buildApp = () => {
 
   app.use(unsub);
 
+  // Stock photos used by the email templates (public, cached).
+  app.use('/photos', express.static(path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../assets/photos'), { maxAge: '30d', index: false, fallthrough: false }));
+
   // Signed image links (see signedFileUrl).
   app.get('/files/*path', async (req, res) => {
     const p = ([] as string[]).concat((req.params as any).path).join('/');

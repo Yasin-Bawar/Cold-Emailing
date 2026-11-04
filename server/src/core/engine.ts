@@ -92,7 +92,7 @@ export const sendTick = async (now = new Date(), makeSender: (a: AccountRow) => 
         if (inline) imageSrc = 'cid:concept';
       }
       const unsub = unsubscribeUrl(pick.lead_id as string);
-      const body = compose({ html: pick.html as string | null, text: pick.text as string | null, address: settings.postal_address, unsubscribeUrl: unsub, imageSrc });
+      const body = compose({ html: pick.html as string | null, text: pick.text as string | null, address: settings.postal_address, unsubscribeUrl: unsub, imageSrc, assetBase: `${env.publicUrl}/photos` });
       const refs = [pick.first_msgid, pick.prev_msgid].filter(Boolean).filter((v, i, a) => a.indexOf(v) === i) as string[];
       const sender = makeSender(acc);
       const replyTo = settings.reply_to || (acc.provider === 'resend' ? firstGmail : null) || null;
