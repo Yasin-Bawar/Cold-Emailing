@@ -179,7 +179,7 @@ export const TYPES: BusinessType[] = [
   }),
   T({
     key: 'pet-grooming', label: 'Pet grooming', plural: 'pet groomers',
-    keywords: ['pet', 'dog', 'grooming', 'groomer', 'grooming salon', 'cat', 'boarding', 'daycare'],
+    keywords: ['pet salon', 'pet spa', 'dog salon', 'dog spa', 'salon dog', 'pet grooming', 'dog grooming', 'pet', 'dog', 'grooming', 'groomer', 'grooming salon', 'cat', 'boarding', 'daycare'],
     photos: ['pet-cut', 'pet-towel', 'pet-bandana'],
     accents: ['#0d9488', '#db2777', '#2563eb', '#ca8a04', '#7c3aed', '#16a34a', '#ea580c', '#0891b2', '#be185d', '#4d7c0f'],
     tagline: 'Happy, fresh pups. Book a grooming online.',
@@ -201,6 +201,7 @@ export const detectType = (...texts: (string | null | undefined)[]): BusinessTyp
   let best: { t: BusinessType; len: number } | null = null;
   for (const t of TYPES)
     for (const k of t.keywords)
-      if (new RegExp(`(^|[^a-z])${k.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`, 'i').test(hay) && (!best || k.length > best.len)) best = { t, len: k.length };
+      // Whole words only (an optional plural s/es), so "shave" doesn't match "Shaved Ice" and "ink" doesn't match "pink".
+      if (new RegExp(`(^|[^a-z])${k.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(e?s)?([^a-z]|$)`, 'i').test(hay) && (!best || k.length > best.len)) best = { t, len: k.length };
   return best?.t ?? null;
 };

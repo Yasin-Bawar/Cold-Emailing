@@ -60,6 +60,12 @@ describe('templates', () => {
     expect(k('Lawn care')).toBe('landscaping');
     expect(k('pet-grooming')).toBe('pet-grooming');
     expect(k('Accounting firm')).toBeUndefined();
+    expect(k('Southern Snow Shaved Ice')).toBeUndefined(); // not a barbershop
+    expect(k('Ko-Ka Laa Pet Salon & Spa')).toBe('pet-grooming');
+    expect(k('Salon Dog')).toBe('pet-grooming');
+    expect(k('Pink Nails')).toBe('nail-salon');
+    expect(k('Mobile mechanic Kmv Mobile Auto Repair')).toBe('auto-repair');
+    expect(k('Food truck Southern Snow Shaved Ice')).toBe('food-truck');
   });
 
   it('makes a threaded plain-text follow-up', () => {
